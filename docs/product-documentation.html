@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nifty Options AI Agent — Complete Product Documentation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0a0e1a;color:#d1d5db;line-height:1.7;max-width:1100px;margin:0 auto;padding:30px 40px 80px;}
+@media(max-width:800px){body{padding:16px;}}
+
+/* Typography */
+h1{font-size:2.6em;text-align:center;margin-bottom:8px;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.2;}
+.subtitle{text-align:center;color:#6b7280;font-size:1.05em;margin-bottom:50px;}
+h2{color:#00d4ff;font-size:1.6em;margin:55px 0 18px;padding-bottom:10px;border-bottom:2px solid #1a2040;}
+h3{color:#a78bfa;font-size:1.2em;margin:30px 0 12px;}
+h4{color:#f59e0b;font-size:1em;margin:22px 0 8px;}
+p{margin:10px 0;font-size:0.93em;color:#d1d5db;}
+ul,ol{margin:10px 0 10px 24px;} li{margin:5px 0;font-size:0.92em;}
+strong{color:#e0e0e0;}
+
+/* TOC */
+.toc{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:24px 30px;margin:30px 0;}
+.toc h3{margin-top:0;color:#00d4ff;} .toc ol{margin:10px 0 0 20px;} .toc li{margin:4px 0;}
+.toc a{color:#a78bfa;text-decoration:none;font-size:0.9em;} .toc a:hover{color:#00d4ff;text-decoration:underline;}
+.toc ol ol{margin:4px 0 4px 16px;} .toc ol ol li{font-size:0.85em;}
+
+/* Cards */
+.card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:24px;margin:16px 0;}
+.card.accent{border-left:4px solid var(--ac,#3b82f6);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+/* Code */
+.code{background:#0a0f1e;border:1px solid #1a2545;border-radius:10px;padding:16px 18px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:0.83em;color:#7dd3fc;margin:12px 0;overflow-x:auto;white-space:pre-wrap;line-height:1.55;}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.88em;}
+th{background:#1a2240;color:#00d4ff;padding:10px 14px;text-align:left;font-weight:600;}
+td{padding:10px 14px;border-bottom:1px solid #1a2040;}
+tr:hover td{background:#0f1629;}
+
+/* Flow boxes */
+.flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:20px 0;}
+.flow-h{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center;margin:6px 0;}
+.fb{background:linear-gradient(135deg,#131830,#1a2240);border:1px solid #2a3460;border-radius:12px;padding:14px 22px;min-width:180px;text-align:center;transition:0.2s;}
+.fb:hover{border-color:#00d4ff;transform:scale(1.02);}
+.fb .icon{font-size:1.4em;margin-bottom:3px;} .fb .title{font-weight:700;font-size:0.9em;color:#fff;}
+.fb .desc{font-size:0.76em;color:#9ca3af;margin-top:4px;line-height:1.4;}
+.fb.green{border-color:#10b981;} .fb.red{border-color:#ef4444;} .fb.blue{border-color:#3b82f6;}
+.fb.purple{border-color:#a78bfa;} .fb.orange{border-color:#f59e0b;} .fb.cyan{border-color:#06b6d4;}
+.arrow{color:#2a3460;font-size:1.6em;line-height:1;}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.72em;font-weight:700;}
+.bg{background:#064e3b;color:#10b981;} .br{background:#450a0a;color:#ef4444;} .bb{background:#172554;color:#3b82f6;}
+.bo{background:#451a03;color:#f59e0b;} .bp{background:#2e1065;color:#a78bfa;}
+
+/* Architecture */
+pre.arch{font-family:'JetBrains Mono',monospace;font-size:0.72em;color:#6b7280;line-height:1.6;background:#0a0f1e;padding:20px;border-radius:12px;border:1px solid #1a2545;overflow-x:auto;}
+
+/* Metric highlight */
+.metric{display:inline-block;background:#111827;border:1px solid #253050;border-radius:8px;padding:4px 12px;font-weight:700;margin:2px;}
+.metric.g{color:#10b981;border-color:#10b981;} .metric.r{color:#ef4444;border-color:#ef4444;}
+.metric.b{color:#3b82f6;border-color:#3b82f6;}
+
+/* Section numbering counter */
+.section-num{color:#00d4ff;font-weight:800;margin-right:8px;}
+
+/* Key-value list */
+.kv{display:grid;grid-template-columns:200px 1fr;gap:4px 16px;font-size:0.88em;margin:10px 0;}
+.kv dt{color:#6b7280;font-weight:600;} .kv dd{color:#e0e0e0;}
+
+/* Callout */
+.callout{background:#172554;border:1px solid #3b82f6;border-radius:10px;padding:14px 18px;margin:14px 0;font-size:0.88em;}
+.callout.warn{background:#451a03;border-color:#f59e0b;} .callout.danger{background:#450a0a;border-color:#ef4444;}
+.callout b{color:#fff;}
+</style>
+</head>
+<body>
+
+<h1>Nifty Options AI Agent</h1>
+<p class="subtitle">Complete Product Documentation — Architecture, Strategies, Backtesting & Operations</p>
+
+<!-- ════════════════ TABLE OF CONTENTS ════════════════ -->
+<div class="toc">
+<h3>Table of Contents</h3>
+<ol>
+<li><a href="#s1">Product Overview</a></li>
+<li><a href="#s2">System Architecture</a>
+  <ol><li>Directory Structure</li><li>Module Map</li><li>Data Flow</li><li>Technology Stack</li></ol></li>
+<li><a href="#s3">Live Trading System</a>
+  <ol><li>Broker Integration (Kite Connect)</li><li>WebSocket Streaming</li><li>WhatsApp Alerts (Twilio)</li><li>Main Orchestration Loop</li><li>Scheduler</li></ol></li>
+<li><a href="#s4">Strategy Engine</a>
+  <ol><li>Trend Detection (6 Indicators)</li><li>7-Gate Filter System</li><li>Strategy 1: Momentum Breakout</li><li>Strategy 2: OI Reversal</li><li>Scoring Engine (0-100)</li></ol></li>
+<li><a href="#s5">Risk Management</a>
+  <ol><li>Position Sizing</li><li>Stop Loss Calculation</li><li>Target Calculation</li><li>Hard Limits</li></ol></li>
+<li><a href="#s6">Exit Logic</a>
+  <ol><li>4-Stage Trailing Stop Loss</li><li>Partial Profit Booking</li><li>Time-Based Exits</li><li>Exit Priority Order</li></ol></li>
+<li><a href="#s7">Per-Underlying Tuning</a>
+  <ol><li>NIFTY Parameters</li><li>BANKNIFTY Parameters</li><li>Why They Differ</li></ol></li>
+<li><a href="#s8">Backtesting Engine</a>
+  <ol><li>Data Generation</li><li>Engine Architecture</li><li>Multi-Underlying Support</li><li>Performance Analyzer</li></ol></li>
+<li><a href="#s9">Dashboard & Reporting</a>
+  <ol><li>Overview Tab</li><li>Daily Breakdown</li><li>Performance Analysis</li><li>Trade Explorer (Drill-Down)</li></ol></li>
+<li><a href="#s10">AI Integration (Claude API)</a></li>
+<li><a href="#s11">Database Schema</a></li>
+<li><a href="#s12">Backtesting Results</a>
+  <ol><li>November 2025</li><li>January 2026</li><li>Strategy Evolution (V0 to V4)</li></ol></li>
+<li><a href="#s13">Configuration Reference</a></li>
+<li><a href="#s14">Setup & Deployment</a></li>
+<li><a href="#s15">Charges & Cost Structure</a></li>
+<li><a href="#s16">Known Limitations & Future Work</a></li>
+</ol>
+</div>
+
+<!-- ════════════════ 1. PRODUCT OVERVIEW ════════════════ -->
+<h2 id="s1"><span class="section-num">1.</span> Product Overview</h2>
+
+<p>The Nifty Options AI Agent is a fully automated options trading system for Indian markets (NSE). It scans NIFTY 50 index options in real-time, identifies high-probability trade setups using technical indicators and Open Interest analysis, sends trade alerts to the user's WhatsApp, waits for confirmation, executes orders on Zerodha via Kite Connect API, and manages the position with trailing stop-losses until exit.</p>
+
+<div class="card">
+<h4>What It Does (End to End)</h4>
+<div class="flow">
+  <div class="fb cyan"><div class="title">1. Scan</div><div class="desc">Every 2 min, scan NIFTY option chain<br>Filter ATM &plusmn; 10 strikes</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="fb purple"><div class="title">2. Analyze</div><div class="desc">6 technical indicators detect trend<br>7 gates filter bad setups</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="fb blue"><div class="title">3. Score & Select</div><div class="desc">Rank options by OI, volume, trend<br>Pick the best setup (score &ge; 50)</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="fb green"><div class="title">4. Alert</div><div class="desc">WhatsApp message with entry, SL, target<br>Wait for YES/NO (5 min timeout)</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="fb orange"><div class="title">5. Execute</div><div class="desc">Place market order on Zerodha<br>Set SL order automatically</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="fb red"><div class="title">6. Monitor & Exit</div><div class="desc">Track every tick, trail SL<br>Auto-exit at target/SL/EOD</div></div>
+</div>
+</div>
+
+<div class="card">
+<h4>Key Capabilities</h4>
+<div class="grid-2">
+<div>
+<ul>
+<li>Real-time option chain scanning via KiteTicker WebSocket</li>
+<li>Two trading strategies: Momentum Breakout + OI Reversal</li>
+<li>6-indicator trend detection engine</li>
+<li>7-gate entry filter system</li>
+<li>4-stage progressive trailing stop loss</li>
+<li>Partial profit booking at 50% of target</li>
+</ul>
+</div>
+<div>
+<ul>
+<li>Per-underlying parameter tuning (NIFTY vs BANKNIFTY)</li>
+<li>WhatsApp alerts with confirmation workflow</li>
+<li>Full backtesting engine with 1-min resolution</li>
+<li>Interactive dashboard with trade drill-downs</li>
+<li>AI-powered trade analysis via Claude API</li>
+<li>Comprehensive risk management with hard limits</li>
+</ul>
+</div>
+</div>
+</div>
+
+<!-- ════════════════ 2. SYSTEM ARCHITECTURE ════════════════ -->
+<h2 id="s2"><span class="section-num">2.</span> System Architecture</h2>
+
+<h3>2.1 Directory Structure</h3>
+<div class="code">nifty-options-agent/
+&boxvr;&boxh;&boxh; config/
+&boxv;   &boxvr;&boxh;&boxh; settings.py          # All config: API keys, thresholds, risk params
+&boxv;   &boxur;&boxh;&boxh; instruments.py       # NIFTY/BANKNIFTY instrument token mappings
+&boxvr;&boxh;&boxh; broker/
+&boxv;   &boxvr;&boxh;&boxh; kite_auth.py         # Kite Connect OAuth + TOTP automated login
+&boxv;   &boxvr;&boxh;&boxh; kite_client.py       # Order placement, position fetch, margin check
+&boxv;   &boxur;&boxh;&boxh; kite_websocket.py    # Live tick streaming via KiteTicker
+&boxvr;&boxh;&boxh; strategy/
+&boxv;   &boxvr;&boxh;&boxh; indicators.py        # EMA, RSI, MACD, Supertrend, Bollinger, VWAP, ATR
+&boxv;   &boxvr;&boxh;&boxh; options_scanner.py   # Fetch option chain, compute Greeks, rank setups
+&boxv;   &boxvr;&boxh;&boxh; signal_generator.py  # Rule-based signal generation (Momentum + OI)
+&boxv;   &boxvr;&boxh;&boxh; risk_manager.py      # Position sizing, max loss, SL/target calc
+&boxv;   &boxur;&boxh;&boxh; exit_manager.py      # Trailing SL, time-based exit, target exit logic
+&boxvr;&boxh;&boxh; whatsapp/
+&boxv;   &boxvr;&boxh;&boxh; twilio_client.py     # Send WhatsApp messages via Twilio
+&boxv;   &boxvr;&boxh;&boxh; webhook_server.py    # Flask app to receive WhatsApp replies
+&boxv;   &boxur;&boxh;&boxh; message_templates.py # Format trade alert / exit / P&L messages
+&boxvr;&boxh;&boxh; ai/
+&boxv;   &boxvr;&boxh;&boxh; trade_analyzer.py    # Claude API integration for trade reasoning
+&boxv;   &boxur;&boxh;&boxh; prompts.py           # System + user prompts for AI analysis
+&boxvr;&boxh;&boxh; database/
+&boxv;   &boxvr;&boxh;&boxh; models.py            # SQLite schema: signals, trades, sessions
+&boxv;   &boxur;&boxh;&boxh; db.py                # DB connection and CRUD helpers
+&boxvr;&boxh;&boxh; backtest/
+&boxv;   &boxvr;&boxh;&boxh; data_fetcher.py      # Historical data from Kite + synthetic generator
+&boxv;   &boxvr;&boxh;&boxh; engine.py            # Core backtesting engine + multi-underlying
+&boxv;   &boxvr;&boxh;&boxh; analyzer.py          # 30+ performance metrics calculator
+&boxv;   &boxvr;&boxh;&boxh; report.py            # Static HTML report generator
+&boxv;   &boxvr;&boxh;&boxh; dashboard.py         # Interactive dashboard with trade drill-downs
+&boxv;   &boxur;&boxh;&boxh; run_backtest.py      # CLI entry point for backtesting
+&boxvr;&boxh;&boxh; docs/
+&boxv;   &boxvr;&boxh;&boxh; system-architecture.html
+&boxv;   &boxvr;&boxh;&boxh; strategy-deep-dive.html
+&boxv;   &boxur;&boxh;&boxh; product-documentation.html  (this file)
+&boxvr;&boxh;&boxh; main.py                  # Entry point: orchestrates the full live loop
+&boxvr;&boxh;&boxh; scheduler.py             # APScheduler jobs for market hours
+&boxvr;&boxh;&boxh; requirements.txt
+&boxur;&boxh;&boxh; .env                     # Secrets (never committed)</div>
+
+<h3>2.2 Module Map</h3>
+<pre class="arch">
+&boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;
+&boxv;                           MAIN.PY (Orchestrator)                          &boxv;
+&boxv;  Connects all modules. Manages lifecycle, signal flow, confirmations.     &boxv;
+&boxgr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxj;
+&boxv;                                                                            &boxv;
+&boxv;  &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;   &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;   &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;   &boxv;
+&boxv;  &boxv;   BROKER LAYER    &boxv;   &boxv;   STRATEGY LAYER   &boxv;   &boxv;    WHATSAPP LAYER  &boxv;   &boxv;
+&boxv;  &boxv; kite_auth.py      &boxv;   &boxv; indicators.py      &boxv;   &boxv; twilio_client.py   &boxv;   &boxv;
+&boxv;  &boxv; kite_client.py    &boxv;&lt;-&gt;&boxv; options_scanner.py  &boxv;   &boxv; webhook_server.py  &boxv;   &boxv;
+&boxv;  &boxv; kite_websocket.py &boxv;   &boxv; signal_generator.py &boxv;   &boxv; message_templates   &boxv;   &boxv;
+&boxv;  &boxv;                   &boxv;   &boxv; risk_manager.py     &boxv;   &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;   &boxv;
+&boxv;  &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;   &boxv; exit_manager.py     &boxv;                          &boxv;
+&boxv;                         &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;   &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;   &boxv;
+&boxv;  &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;                         &boxv;      AI LAYER      &boxv;   &boxv;
+&boxv;  &boxv;  DATABASE LAYER  &boxv;   &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;   &boxv; trade_analyzer.py  &boxv;   &boxv;
+&boxv;  &boxv; models.py        &boxv;   &boxv;  BACKTEST ENGINE   &boxv;   &boxv; prompts.py         &boxv;   &boxv;
+&boxv;  &boxv; db.py            &boxv;   &boxv; engine.py          &boxv;   &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;   &boxv;
+&boxv;  &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;   &boxv; analyzer.py        &boxv;                          &boxv;
+&boxv;                         &boxv; dashboard.py       &boxv;                          &boxv;
+&boxv;                         &boxv; data_fetcher.py    &boxv;                          &boxv;
+&boxv;                         &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;                          &boxv;
+&boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;
+
+  EXTERNAL SERVICES:
+  &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;   &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;   &boxdr;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxdl;
+  &boxv;  Zerodha   &boxv;   &boxv;   Twilio   &boxv;   &boxv;  Anthropic &boxv;
+  &boxv;  Kite API  &boxv;   &boxv;  WhatsApp &boxv;   &boxv; Claude API &boxv;
+  &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;   &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;   &boxur;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxh;&boxul;
+</pre>
+
+<h3>2.3 Data Flow</h3>
+<div class="card">
+<p>The system processes data through an 8-step pipeline, from raw market data to executed trades:</p>
+<table>
+<tr><th>Step</th><th>Module</th><th>Input</th><th>Output</th><th>Frequency</th></tr>
+<tr><td>1</td><td>kite_client</td><td>NFO instruments list</td><td>Cached token/lot/expiry data</td><td>Once/day at 9:00 AM</td></tr>
+<tr><td>2</td><td>kite_client</td><td>Underlying name</td><td>Spot price (LTP)</td><td>Every scan cycle</td></tr>
+<tr><td>3</td><td>options_scanner</td><td>Spot + instruments</td><td>ATM &plusmn;10 options with quotes</td><td>Every scan cycle</td></tr>
+<tr><td>4</td><td>indicators</td><td>Last 50 spot candles</td><td>Trend direction + strength</td><td>Every scan cycle</td></tr>
+<tr><td>5</td><td>options_scanner</td><td>Options + Greeks</td><td>Scored setups (0-100)</td><td>Every scan cycle</td></tr>
+<tr><td>6</td><td>signal_generator</td><td>Scored setups + trend</td><td>TradeSignal (entry/SL/target)</td><td>When setup found</td></tr>
+<tr><td>7</td><td>risk_manager</td><td>Signal + account state</td><td>Approved/rejected + qty</td><td>Per signal</td></tr>
+<tr><td>8</td><td>exit_manager</td><td>Live ticks + position</td><td>Exit order</td><td>Every tick</td></tr>
+</table>
+</div>
+
+<h3>2.4 Technology Stack</h3>
+<table>
+<tr><th>Component</th><th>Technology</th><th>Purpose</th></tr>
+<tr><td>Language</td><td>Python 3.9+</td><td>All business logic</td></tr>
+<tr><td>Broker API</td><td>Zerodha Kite Connect</td><td>Orders, positions, WebSocket ticks</td></tr>
+<tr><td>WhatsApp</td><td>Twilio Business API</td><td>Trade alerts + confirmation</td></tr>
+<tr><td>AI/LLM</td><td>Anthropic Claude API</td><td>Trade reasoning (optional)</td></tr>
+<tr><td>Web Framework</td><td>Flask</td><td>Twilio webhook receiver</td></tr>
+<tr><td>Scheduler</td><td>APScheduler</td><td>Cron jobs for market hours</td></tr>
+<tr><td>Database</td><td>SQLite</td><td>Trade log, sessions, signals</td></tr>
+<tr><td>Data Science</td><td>NumPy, SciPy, Pandas</td><td>Greeks, indicators, analysis</td></tr>
+<tr><td>Visualization</td><td>Chart.js</td><td>Dashboard charts</td></tr>
+</table>
+
+<!-- ════════════════ 3. LIVE TRADING SYSTEM ════════════════ -->
+<h2 id="s3"><span class="section-num">3.</span> Live Trading System</h2>
+
+<h3>3.1 Broker Integration (Kite Connect)</h3>
+<div class="card accent" style="--ac:#3b82f6;">
+<h4>Authentication Flow (kite_auth.py)</h4>
+<div class="code">1. Generate TOTP code using pyotp + KITE_TOTP_SECRET (base32)
+2. POST credentials + TOTP to Zerodha login endpoint
+3. Extract request_token from redirect URL
+4. Exchange request_token for access_token via kite.generate_session()
+5. Store access_token in SQLite (valid until ~6 AM next day)
+6. On failure: retry 3 times with 30-second gaps, then WhatsApp alert</div>
+
+<h4>Trading Operations (kite_client.py)</h4>
+<p>Wrapper around KiteConnect providing: option chain fetching, LTP/quote retrieval, spot price, order placement (market/limit/bracket), order modification (for trailing SL), position tracking, and margin checking. All NFO instruments are cached once daily at startup.</p>
+
+<h4>WebSocket Streaming (kite_websocket.py)</h4>
+<p>KiteTicker in MODE_FULL provides: last_price, OHLC, volume, OI, bid/ask depth, and implied volatility. Runs in a background thread with auto-reconnect. Used for real-time position monitoring and tick-by-tick exit checking.</p>
+</div>
+
+<h3>3.2 WhatsApp Integration</h3>
+<div class="card accent" style="--ac:#10b981;">
+<h4>Outgoing Messages (twilio_client.py)</h4>
+<p>Sends formatted messages for: trade alerts, execution confirmations, exit notifications with P&L, daily summaries, error alerts, and system status (online/offline).</p>
+
+<h4>Incoming Commands (webhook_server.py)</h4>
+<p>Flask server receives Twilio POST webhooks. Supported commands:</p>
+<table>
+<tr><th>Command</th><th>Action</th></tr>
+<tr><td>YES / Y</td><td>Execute the pending trade</td></tr>
+<tr><td>NO / N</td><td>Skip the pending trade</td></tr>
+<tr><td>STATUS</td><td>Show current positions and daily P&L</td></tr>
+<tr><td>POSITIONS</td><td>List all open positions with P&L</td></tr>
+<tr><td>STOP</td><td>Stop all trading for the day</td></tr>
+<tr><td>EXIT ALL</td><td>Immediately exit all positions</td></tr>
+<tr><td>EXIT &lt;symbol&gt;</td><td>Exit a specific position</td></tr>
+</table>
+<p>Signals auto-expire after 5 minutes if no reply is received.</p>
+</div>
+
+<h3>3.3 Main Orchestration Loop (main.py)</h3>
+<div class="card">
+<table>
+<tr><th>Phase</th><th>Time</th><th>What Happens</th></tr>
+<tr><td>Pre-Market</td><td>9:00 AM</td><td>Auto-login to Kite, verify margins, subscribe WebSocket, send "System Online"</td></tr>
+<tr><td>Scanning</td><td>9:20 - 15:15</td><td>Scan option chain, run indicators, generate signals, send WhatsApp alerts</td></tr>
+<tr><td>Confirmation</td><td>Webhook</td><td>On YES: execute order, start exit monitor. On NO: mark skipped. On timeout: expire.</td></tr>
+<tr><td>Monitoring</td><td>Continuous</td><td>Check SL/target/trailing/time exits on every tick</td></tr>
+<tr><td>EOD</td><td>15:15</td><td>Square off all MIS positions</td></tr>
+<tr><td>Summary</td><td>15:35</td><td>Send daily P&L summary, store stats, send "System Offline"</td></tr>
+</table>
+</div>
+
+<!-- ════════════════ 4. STRATEGY ENGINE ════════════════ -->
+<h2 id="s4"><span class="section-num">4.</span> Strategy Engine</h2>
+
+<h3>4.1 Trend Detection — 6 Technical Indicators</h3>
+<p>The trend detector runs 6 independent indicators on 5-minute candles (even when using 1-min data for scanning, indicators are computed on resampled 5-min bars for stability). Each indicator votes BULL, BEAR, or NEUTRAL. The aggregate determines the trend.</p>
+
+<div class="grid-2">
+<div class="card accent" style="--ac:#3b82f6;">
+<h4>1. EMA Crossover (5/13)</h4>
+<p>Exponential Moving Average of last 5 candles vs 13 candles. When fast EMA (5) crosses above slow EMA (13), it signals bullish momentum. Faster than traditional 9/21 to catch reversals earlier.</p>
+<div class="code">Signal: EMA5 > EMA13 = BULL
+        EMA5 < EMA13 = BEAR</div>
+</div>
+<div class="card accent" style="--ac:#10b981;">
+<h4>2. Price vs EMA 20</h4>
+<p>Is current price above or below its 20-period EMA? Shorter than EMA 50 (which lagged too much for detecting bearish trends).</p>
+<div class="code">Signal: Price > EMA20 = BULL
+        Price < EMA20 = BEAR</div>
+</div>
+<div class="card accent" style="--ac:#a78bfa;">
+<h4>3. RSI (14-period)</h4>
+<p>Relative Strength Index. Uses wider bands (55/45) so it contributes direction more often. Also used as an entry guard to block exhausted trends.</p>
+<div class="code">Signal: RSI > 55 = BULL
+        RSI < 45 = BEAR
+        45-55   = NEUTRAL (0.5 bull vote)</div>
+</div>
+<div class="card accent" style="--ac:#f59e0b;">
+<h4>4. MACD (12/26/9)</h4>
+<p>Moving Average Convergence Divergence histogram. Positive histogram means bullish momentum is accelerating.</p>
+<div class="code">Signal: Histogram > 0 = BULL
+        Histogram < 0 = BEAR</div>
+</div>
+<div class="card accent" style="--ac:#ef4444;">
+<h4>5. Supertrend (7, 2.5)</h4>
+<p>Volatility-based trend indicator using ATR. Faster parameters (7, 2.5) instead of default (10, 3.0) for quicker reversal detection.</p>
+<div class="code">Signal: Price above line = BULL
+        Price below line = BEAR</div>
+</div>
+<div class="card accent" style="--ac:#06b6d4;">
+<h4>6. Price Action (3-candle slope)</h4>
+<p>Are the last 3 closing prices rising or falling? This is the only LEADING indicator (all others lag). Also used as the momentum confirmation gate.</p>
+<div class="code">Signal: Close[now] > Close[3 bars ago] = BULL
+        Close[now] < Close[3 bars ago] = BEAR
+        Otherwise = NEUTRAL</div>
+</div>
+</div>
+
+<div class="card">
+<h4>Aggregation Logic</h4>
+<div class="code">bull_pct = (bullish_votes / 6) &times; 100
+bear_pct = 100 - bull_pct
+
+NEUTRAL votes count as 0.5 bullish.
+
+Direction:
+  bull_pct &ge; 60%  &rarr;  BULLISH   (buy CE)
+  bear_pct &ge; 55%  &rarr;  BEARISH   (buy PE)
+  otherwise        &rarr;  NEUTRAL   (no trade)
+
+ASYMMETRIC THRESHOLDS:
+  Bear needs only 55% (not 60%) because bearish signals are harder
+  to generate from lagging indicators. By the time EMA/Supertrend/MACD
+  all flip bearish, the RSI is already at 15-25 and the move is nearly over.
+
+EXHAUSTION FILTER:
+  If bull_pct > 92% or bear_pct > 92%, SKIP.
+  When ALL indicators agree, the trend is mature/ending, not beginning.
+  Data showed losers had HIGHER trend strength (92%) than winners (69%).</div>
+</div>
+
+<h3>4.2 The 7-Gate Filter System</h3>
+<p>Every potential trade must pass ALL 7 gates. Each gate was added to solve a specific problem discovered during backtesting.</p>
+
+<table>
+<tr><th>Gate</th><th>Check</th><th>Problem It Solves</th></tr>
+<tr><td><span class="badge bb">1</span> Trend Direction</td><td>Bull &ge;60% or Bear &ge;55%</td><td>Random entries in choppy markets (40% of original losses)</td></tr>
+<tr><td><span class="badge bb">1b</span> Exhaustion</td><td>Strength &lt; 92%</td><td>Buying at end of moves. Losers had 92% strength vs winners 69%</td></tr>
+<tr><td><span class="badge bp">2</span> RSI Guard</td><td>CE: RSI &lt; 75. PE: RSI &gt; 20</td><td>9 losers entered with RSI &gt; 65 in V1</td></tr>
+<tr><td><span class="badge bg">3</span> Momentum</td><td>Last 3 candles in trend direction</td><td>33/42 losers hit SL in 5 min with MFE=0 — price was moving opposite</td></tr>
+<tr><td><span class="badge bo">4</span> Daily Limit</td><td>Max 2 trades/day per underlying</td><td>Overtrading — V0 did 6.7 trades/day, mostly noise</td></tr>
+<tr><td><span class="badge bo">5</span> Cooldown</td><td>30 min gap between trades</td><td>Revenge trading after a stop-loss</td></tr>
+<tr><td><span class="badge br">6</span> Risk Check</td><td>Daily P&L &gt; -5K, positions &lt; 2</td><td>Catastrophic loss days</td></tr>
+</table>
+
+<h3>4.3 Strategy 1: Momentum Breakout</h3>
+<div class="card accent" style="--ac:#3b82f6;">
+<p><strong>Logic:</strong> Buy options in the direction of the confirmed trend when a high-scoring, liquid option is found with volume &gt; 10,000 contracts.</p>
+<div class="code">ENTRY:
+  Trend must be BULLISH (buy CE) or BEARISH (buy PE)
+  Option score &ge; 50/100
+  Volume &gt; 10,000 contracts
+  Premium between 50 and 500
+
+STOP LOSS (ATR-based):
+  SL = Entry - (ATR &times; multiplier &times; estimated_delta)
+  Floor: never tighter than min_sl_pct of premium
+  Cap: never wider than 50% of premium
+
+TARGET:
+  Target = Entry + (risk &times; R:R ratio)
+  NIFTY: R:R = 2.0 | BANKNIFTY: R:R = 1.5</div>
+</div>
+
+<h3>4.4 Strategy 2: OI Reversal</h3>
+<div class="card accent" style="--ac:#10b981;">
+<p><strong>Logic:</strong> When massive Open Interest (&gt;200K contracts) builds up at a strike, option writers defend that level. High Put OI = support (bullish). High Call OI = resistance (bearish). Buy options where OI confirms the trend.</p>
+<div class="code">BULLISH trend + High Put OI at nearby strike:
+  Writers sold PUTs = will defend support = buy CE
+
+BEARISH trend + High Call OI at nearby strike:
+  Writers sold CALLs = will defend resistance = buy PE
+
+Same SL/target/sizing rules as Momentum.
+
+BACKTESTING RESULT:
+  OI Reversal: 69-82% win rate, dominant P&L contributor
+  Momentum: 20% win rate, net negative
+  OI Reversal is the primary profit generator.</div>
+</div>
+
+<h3>4.5 Scoring Engine (0-100)</h3>
+<table>
+<tr><th>Component</th><th>Max</th><th>Logic</th></tr>
+<tr><td>Trend Alignment</td><td>25</td><td>&ge;83% = 25, &ge;66% = 15, &ge;50% = 5</td></tr>
+<tr><td>Open Interest</td><td>20</td><td>&gt;1M = 20, &gt;500K = 15, &gt;100K = 10, &gt;50K = 5</td></tr>
+<tr><td>Moneyness</td><td>15</td><td>0.5-2% OTM = 15, &lt;4% = 10</td></tr>
+<tr><td>Volume</td><td>15</td><td>&gt;100K = 15, &gt;50K = 10, &gt;10K = 5</td></tr>
+<tr><td>Premium Level</td><td>10</td><td>Rs.100-500 = 10, Rs.50-1000 = 5</td></tr>
+<tr><td>Vol/OI Ratio</td><td>10</td><td>0.1-0.5 = 10, &lt;1.0 = 5</td></tr>
+<tr><td><strong>Total</strong></td><td><strong>95</strong></td><td><strong>Minimum threshold: 50</strong></td></tr>
+</table>
+
+<!-- ════════════════ 5. RISK MANAGEMENT ════════════════ -->
+<h2 id="s5"><span class="section-num">5.</span> Risk Management</h2>
+
+<div class="grid-2">
+<div class="card accent" style="--ac:#ef4444;">
+<h4>Hard Limits</h4>
+<dl class="kv">
+<dt>Max loss per trade</dt><dd>Rs.2,000</dd>
+<dt>Max loss per day</dt><dd>Rs.5,000 (stop all trading)</dd>
+<dt>Max open positions</dt><dd>2 per underlying</dd>
+<dt>Max trades per day</dt><dd>2 per underlying</dd>
+<dt>Min R:R ratio</dt><dd>1.5</dd>
+<dt>Min premium</dt><dd>Rs.50</dd>
+<dt>Max premium (BNF)</dt><dd>Rs.500</dd>
+</dl>
+</div>
+<div class="card accent" style="--ac:#f59e0b;">
+<h4>Position Sizing Formula</h4>
+<div class="code">risk_per_unit = |Entry - SL|
+max_units = MAX_LOSS / risk_per_unit
+lots = floor(max_units / lot_size)
+lots = max(lots, 1)
+quantity = lots &times; lot_size
+
+Example:
+  Entry=200, SL=170, lot=75
+  risk/unit = 30
+  max_units = 2000/30 = 66
+  lots = floor(66/75) = 0 &rarr; 1
+  qty = 75
+  max loss = 30 &times; 75 = Rs.2,250</div>
+</div>
+</div>
+
+<!-- ════════════════ 6. EXIT LOGIC ════════════════ -->
+<h2 id="s6"><span class="section-num">6.</span> Exit Logic</h2>
+
+<h3>6.1 Exit Priority Order</h3>
+<table>
+<tr><th>#</th><th>Condition</th><th>Action</th></tr>
+<tr><td>1</td><td>Price &le; Trailing SL</td><td>Immediate market exit (hard stop or trailing)</td></tr>
+<tr><td>2</td><td>EOD 3:15 PM</td><td>Square off all MIS positions</td></tr>
+<tr><td>3</td><td>50% of target + qty &gt; 1 lot</td><td>Partial exit: sell 50% qty, trail SL to breakeven</td></tr>
+<tr><td>4</td><td>Price &ge; Target + held &ge; 10 candles</td><td>Full exit at target</td></tr>
+<tr><td>5</td><td>Trailing SL stages (below)</td><td>Tighten SL progressively</td></tr>
+<tr><td>6</td><td>Held &gt; 2 hours with &lt; 10% profit</td><td>Exit (theta decay eating premium)</td></tr>
+</table>
+
+<h3>6.2 4-Stage Trailing Stop Loss</h3>
+<div class="card">
+<div class="code">total_move = Target - Entry
+current_move = Current Price - Entry
+move_pct = (current_move / total_move) &times; 100
+
+Stage 1: move_pct &ge; 30% (NIFTY) / 20% (BANKNIFTY)
+  &rarr; Trail SL to BREAKEVEN (Entry price)
+  &rarr; Trade is now risk-free
+
+Stage 2: move_pct &ge; 50%
+  &rarr; Trail SL to Entry + 30% of current_move
+  &rarr; Lock 30% of unrealized profit
+
+Stage 3: move_pct &ge; 70%
+  &rarr; Trail SL to Entry + 50% of current_move
+
+Stage 4: move_pct &ge; 85%
+  &rarr; Trail SL to Entry + 70% of current_move
+
+Example (Entry=200, SL=170, Target=260):
+  total_move = 60
+  Price 218 (30%): SL 170 &rarr; 200 (breakeven)
+  Price 230 (50%): SL &rarr; 200 + 30&times;0.3 = 209
+  Price 242 (70%): SL &rarr; 200 + 42&times;0.5 = 221
+  Price 251 (85%): SL &rarr; 200 + 51&times;0.7 = 235.7</div>
+</div>
+
+<!-- ════════════════ 7. PER-UNDERLYING TUNING ════════════════ -->
+<h2 id="s7"><span class="section-num">7.</span> Per-Underlying Tuning</h2>
+
+<table>
+<tr><th>Parameter</th><th>NIFTY</th><th>BANKNIFTY</th><th>Why Different</th></tr>
+<tr><td>ATR SL Multiplier</td><td>1.5</td><td>3.0</td><td>BNF 5-min range is 40pts vs NIFTY 20pts. Need wider SL to survive noise.</td></tr>
+<tr><td>Min SL %</td><td>10%</td><td>15%</td><td>BNF deep ITM options had 3-5% SL getting hit instantly.</td></tr>
+<tr><td>Max Premium</td><td>No cap</td><td>Rs.500</td><td>Avoids deep ITM options where SL% is tiny.</td></tr>
+<tr><td>R:R Ratio</td><td>2.0</td><td>1.5</td><td>BNF reverses faster. Taking 1.5R at 60% WR beats chasing 2R at 20% WR.</td></tr>
+<tr><td>Breakeven Trigger</td><td>30%</td><td>20%</td><td>BNF needs faster risk-free conversion.</td></tr>
+<tr><td>RSI Cap (CE)</td><td>75</td><td>68</td><td>BNF CE entries at RSI 70-74 were almost all losers.</td></tr>
+<tr><td>Skip First Minutes</td><td>5 min</td><td>30 min</td><td>BNF opening 30 min is extremely noisy. 3 of 3 early entries lost.</td></tr>
+<tr><td>5-min Candle Range</td><td>~20 pts</td><td>~40 pts</td><td>2.2x more volatile intraday.</td></tr>
+<tr><td>Lot Size</td><td>75 units</td><td>30 units</td><td>Set by SEBI.</td></tr>
+</table>
+
+<!-- ════════════════ 8. BACKTESTING ENGINE ════════════════ -->
+<h2 id="s8"><span class="section-num">8.</span> Backtesting Engine</h2>
+
+<h3>8.1 Data Sources</h3>
+<div class="grid-2">
+<div class="card accent" style="--ac:#3b82f6;">
+<h4>Synthetic Data</h4>
+<p>Generates realistic spot + option data without Kite API. Configurable: underlying, days, start price, candle interval (1-min or 5-min). Uses trending/mean-reverting regime cycles for realistic behavior. Automatically generates option chains around the price range with Black-Scholes-like pricing.</p>
+<div class="code">python -m backtest.run_backtest --synthetic --days 30 --interval 1</div>
+</div>
+<div class="card accent" style="--ac:#10b981;">
+<h4>Real Kite Data</h4>
+<p>Fetches historical OHLCV from Kite Connect API. Auto-chunks requests (60-day limit for intraday). Caches to Parquet files. Builds option chain history from NFO instruments list.</p>
+<div class="code">python -m backtest.run_backtest --from 2025-11-01 --to 2025-11-30</div>
+</div>
+</div>
+
+<h3>8.2 Engine Architecture</h3>
+<div class="card">
+<p>The <code>BacktestEngine</code> replays historical candles through the exact same pipeline used in live trading: trend detection &rarr; 7-gate filter &rarr; strategy selection &rarr; position monitoring. When using 1-min data, indicators are computed on resampled 5-min bars for stability, while position monitoring uses the raw 1-min data for precise exit timing.</p>
+<div class="code">Key features:
+  - Scan every N candles (default: 2 = every 2 minutes)
+  - Monitor positions every candle (1-min resolution)
+  - Indicators on 5-min resampled bars (no noise)
+  - Full trade context captured (indicators, trend, scores) for dashboard
+  - Per-underlying parameter overrides via MultiBacktestEngine
+  - Parameter sweeps: --sweep sl_pct 0.10 0.50 0.05</div>
+</div>
+
+<h3>8.3 Performance Analyzer (30+ Metrics)</h3>
+<table>
+<tr><th>Category</th><th>Metrics</th></tr>
+<tr><td>Returns</td><td>Net P&L, Return %, Annualized Return, Gross P&L, Total Charges</td></tr>
+<tr><td>Risk</td><td>Max Drawdown (Rs. + %), Drawdown Duration, Sharpe, Sortino, Calmar</td></tr>
+<tr><td>Trade Quality</td><td>Win Rate, Profit Factor, Expectancy, Avg Winner/Loser, Largest Winner/Loser</td></tr>
+<tr><td>Behavior</td><td>Avg Holding Time (winners vs losers), Max Consecutive Wins/Losses</td></tr>
+<tr><td>Excursion</td><td>Avg MFE (max favorable), Avg MAE (max adverse)</td></tr>
+<tr><td>Breakdown</td><td>Per-strategy stats, exit reason P&L, daily/hourly/weekly splits</td></tr>
+</table>
+
+<!-- ════════════════ 9. DASHBOARD & REPORTING ════════════════ -->
+<h2 id="s9"><span class="section-num">9.</span> Dashboard & Reporting</h2>
+
+<div class="card">
+<p>The dashboard is a single-file HTML application with 4 tabs, powered by Chart.js. Generated by <code>backtest/dashboard.py</code>.</p>
+
+<h4>Tab 1: Overview</h4>
+<p>24 KPI cards (Net P&L, Sharpe, Sortino, Calmar, PF, Win Rate, Max DD, Expectancy, Annualized Return, Best/Worst Day, Capital Utilization, Charges, etc.) + Equity Curve chart + Drawdown % chart.</p>
+
+<h4>Tab 2: Daily Breakdown</h4>
+<p>Daily P&L bars, Daily Capital Deployed, Cumulative P&L line, Daily ROI %, and a full day-by-day table showing trades, W/L, P&L, capital used, ROI, and charges.</p>
+
+<h4>Tab 3: Performance Analysis</h4>
+<p>Hourly P&L + Win Rate, Day-of-Week P&L, Win/Loss Streak chart, Rolling Win Rate (10-trade), Cumulative P&L by Strategy, P&L Distribution waterfall, and Exit Reason breakdown table.</p>
+
+<h4>Tab 4: Trade Explorer (Click to Drill Down)</h4>
+<p>Left sidebar: searchable/filterable trade list. Right panel (on click):</p>
+<ul>
+<li><strong>Outcome banner</strong> — colored green/red with Net P&L, Gross P&L, Charges, Holding, Exit Reason</li>
+<li><strong>10 KPI cards</strong> — Entry, Exit, SL, Target, R:R, Score, Trend Strength, Qty, MFE, MAE</li>
+<li><strong>Option Premium chart</strong> — BUY marker (blue triangle), SELL marker (green/red triangle), Entry/SL/Target/Exit dashed lines. Tooltips show "BUY @ Rs.xxx" and "SELL @ Rs.xxx (reason)"</li>
+<li><strong>Spot chart</strong> — Close + EMA 5/13 + Supertrend with BUY signal marked as large blue dot</li>
+<li><strong>RSI chart</strong> — RSI line with entry marker, overbought (70) and oversold (30) zone lines</li>
+<li><strong>MACD chart</strong> — Histogram bars (green/red) + MACD/Signal lines</li>
+<li><strong>Gate Analysis</strong> — 6 green cards showing each gate's check value</li>
+<li><strong>Indicator Deep Dive</strong> — Each indicator with checkmark/cross, full explanation text, color-coded</li>
+<li><strong>Score Breakdown</strong> — Visual bar chart showing each component's contribution</li>
+<li><strong>SL/Target/Sizing Calculation</strong> — Monospace code block with exact formulas and numbers</li>
+<li><strong>Trade Timeline</strong> — BUY entry &rarr; SL set &rarr; Target set &rarr; Peak profit &rarr; Reversal warning &rarr; SELL exit</li>
+<li><strong>Full Narrative</strong> — AI-generated paragraph explaining trend, indicators, entry reasoning, and outcome</li>
+</ul>
+</div>
+
+<!-- ════════════════ 10. AI INTEGRATION ════════════════ -->
+<h2 id="s10"><span class="section-num">10.</span> AI Integration (Claude API)</h2>
+
+<div class="card accent" style="--ac:#a78bfa;">
+<p>Optional module (<code>ai/trade_analyzer.py</code>) that sends market snapshots to Claude Sonnet for analysis. Used when <code>USE_AI_ANALYSIS=True</code> in settings. Claude receives: spot price, trend data, top 10 options by score with Greeks, IV percentile, and risk parameters. It responds with structured JSON containing action, instrument, entry/SL/target, reasoning, and confidence score.</p>
+<p>Also supports exit evaluation: given a position and current market data, Claude recommends HOLD, EXIT, or ADJUST with new SL/target.</p>
+<p>System prompt enforces: JSON-only response, conservative bias (high-confidence trades only), mandatory SL/target, and clear reasoning (shown to user in WhatsApp alerts).</p>
+</div>
+
+<!-- ════════════════ 11. DATABASE SCHEMA ════════════════ -->
+<h2 id="s11"><span class="section-num">11.</span> Database Schema</h2>
+
+<div class="code">signals:     id, created_at, underlying, tradingsymbol, action, entry_price,
+             stop_loss, target, quantity, reasoning, confidence,
+             status (PENDING/CONFIRMED/REJECTED/EXPIRED/EXECUTED),
+             whatsapp_sent_at, confirmed_at, expired_at
+
+trades:      id, signal_id, entry_order_id, exit_order_id, tradingsymbol,
+             action, entry_price, exit_price, quantity, stop_loss, target,
+             entry_time, exit_time, exit_reason, pnl, charges, net_pnl,
+             status (OPEN/CLOSED/ERROR)
+
+daily_summary: date, total_trades, winners, losers, gross_pnl, net_pnl,
+               max_drawdown, capital_used
+
+sessions:    id, access_token, created_at, valid_until</div>
+
+<!-- ════════════════ 12. BACKTESTING RESULTS ════════════════ -->
+<h2 id="s12"><span class="section-num">12.</span> Backtesting Results</h2>
+
+<h3>12.1 November 2025 (NIFTY, 1-min, 20 trading days)</h3>
+<table>
+<tr><td>Net P&L</td><td><span class="metric g">+71,259</span></td><td>Win Rate</td><td><span class="metric g">69.2%</span></td></tr>
+<tr><td>Sharpe</td><td><span class="metric g">10.69</span></td><td>Profit Factor</td><td><span class="metric g">5.54</span></td></tr>
+<tr><td>Max Drawdown</td><td><span class="metric r">-7,446 (5.2%)</span></td><td>Trades</td><td>26</td></tr>
+<tr><td>OI Reversal</td><td>22 trades, 82% WR, +79K</td><td>Momentum</td><td>4 trades, 0% WR, -7.7K</td></tr>
+<tr><td>CE</td><td>4 trades, +3.7K</td><td>PE</td><td>22 trades, 73% WR, +67.5K</td></tr>
+</table>
+
+<h3>12.2 January 2026 (NIFTY, 1-min, 22 trading days)</h3>
+<table>
+<tr><td>Net P&L</td><td><span class="metric g">+50,272</span></td><td>Win Rate</td><td><span class="metric g">58.3%</span></td></tr>
+<tr><td>Sharpe</td><td><span class="metric g">7.59</span></td><td>Profit Factor</td><td><span class="metric g">3.30</span></td></tr>
+<tr><td>Max Drawdown</td><td><span class="metric r">-9,997 (9.1%)</span></td><td>Trades</td><td>24</td></tr>
+<tr><td>OI Reversal</td><td>19 trades, 68% WR, +54K</td><td>Momentum</td><td>5 trades, 20% WR, -3.8K</td></tr>
+<tr><td>CE</td><td>14 trades, 57% WR, +22K</td><td>PE</td><td>10 trades, 60% WR, +28K</td></tr>
+</table>
+
+<h3>12.3 Strategy Evolution (V0 to V4)</h3>
+<table>
+<tr><th>Version</th><th>WR</th><th>Sharpe</th><th>PF</th><th>Key Change</th><th>Problem Solved</th></tr>
+<tr><td><span class="badge br">V0</span></td><td>10.8%</td><td>Neg</td><td>0.46</td><td>No filters</td><td>Baseline</td></tr>
+<tr><td><span class="badge bo">V1</span></td><td>43.7%</td><td>5.81</td><td>1.71</td><td>Trend filter + ATR SL</td><td>Trading against the trend</td></tr>
+<tr><td><span class="badge bb">V2</span></td><td>53.5%</td><td>5.67</td><td>1.92</td><td>Partial profits + trailing</td><td>Giving back 32% of winner profits</td></tr>
+<tr><td><span class="badge bp">V3</span></td><td>53.3%</td><td>4.38</td><td>2.16</td><td>PE support + faster indicators</td><td>PE never fired (0 trades)</td></tr>
+<tr><td><span class="badge bg">V4</span></td><td>69.2%</td><td>10.69</td><td>5.54</td><td>BNF tuning + exhaustion filter + 1-min data</td><td>BNF instant SL hits + trend exhaustion entries</td></tr>
+</table>
+
+<!-- ════════════════ 13. CONFIGURATION REFERENCE ════════════════ -->
+<h2 id="s13"><span class="section-num">13.</span> Configuration Reference</h2>
+
+<h4>config/settings.py — All Parameters</h4>
+<table>
+<tr><th>Category</th><th>Parameter</th><th>Default</th><th>Description</th></tr>
+<tr><td rowspan="4">Scanning</td><td>SCAN_INTERVAL_SECONDS</td><td>300</td><td>Live mode scan interval</td></tr>
+<tr><td>scan_interval_candles</td><td>2</td><td>Backtest: scan every N candles</td></tr>
+<tr><td>SCAN_UNDERLYINGS</td><td>["NIFTY"]</td><td>Which indices to scan</td></tr>
+<tr><td>STRIKES_RANGE</td><td>10</td><td>ATM &plusmn; N strikes to scan</td></tr>
+<tr><td rowspan="7">Risk</td><td>MAX_LOSS_PER_TRADE</td><td>2000</td><td>Rs. max loss per single trade</td></tr>
+<tr><td>MAX_LOSS_PER_DAY</td><td>5000</td><td>Rs. max daily loss (stop trading)</td></tr>
+<tr><td>MAX_OPEN_POSITIONS</td><td>2</td><td>Simultaneous positions</td></tr>
+<tr><td>max_trades_per_day</td><td>2</td><td>Per underlying</td></tr>
+<tr><td>MIN_RISK_REWARD_RATIO</td><td>1.5</td><td>Minimum R:R to take trade</td></tr>
+<tr><td>MIN_OPTION_PREMIUM</td><td>50</td><td>Skip options below Rs.50</td></tr>
+<tr><td>MAX_BID_ASK_SPREAD_PERCENT</td><td>2.0</td><td>Skip illiquid options</td></tr>
+<tr><td rowspan="5">Exit</td><td>breakeven_trigger_pct</td><td>30</td><td>Trail to breakeven at N% of target</td></tr>
+<tr><td>partial_exit_pct</td><td>50</td><td>Book 50% qty at N% of target</td></tr>
+<tr><td>MAX_HOLDING_MINUTES</td><td>120</td><td>Exit if held &gt; 2hr with &lt;10% profit</td></tr>
+<tr><td>EOD_EXIT_TIME</td><td>15:15</td><td>Square off MIS positions</td></tr>
+<tr><td>min_hold_candles</td><td>10</td><td>Min candles before target exit</td></tr>
+<tr><td rowspan="4">Trend</td><td>min_trend_strength</td><td>60</td><td>Min bull % for bullish signal</td></tr>
+<tr><td>min_bear_strength</td><td>45</td><td>Min bear % for bearish signal</td></tr>
+<tr><td>max_trend_strength</td><td>92</td><td>Skip exhausted trends</td></tr>
+<tr><td>cooldown_candles</td><td>30</td><td>Min candles between trades</td></tr>
+</table>
+
+<!-- ════════════════ 14. SETUP & DEPLOYMENT ════════════════ -->
+<h2 id="s14"><span class="section-num">14.</span> Setup & Deployment</h2>
+
+<div class="card">
+<h4>Quick Start</h4>
+<div class="code"># 1. Clone and setup
+cd nifty-options-agent
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Configure
+cp .env.example .env
+# Edit .env with your Kite API key, Twilio credentials, etc.
+
+# 3. Backtest first (no API keys needed)
+python -m backtest.run_backtest --synthetic --days 30 --dashboard
+
+# 4. Run live
+python main.py</div>
+
+<h4>Required API Keys</h4>
+<table>
+<tr><th>Service</th><th>Key</th><th>How to Get</th></tr>
+<tr><td>Zerodha</td><td>KITE_API_KEY, KITE_API_SECRET</td><td>developers.kite.trade (Rs.2000/month)</td></tr>
+<tr><td>Zerodha</td><td>KITE_TOTP_SECRET</td><td>Kite &gt; Settings &gt; Security &gt; Enable TOTP (save base32 secret)</td></tr>
+<tr><td>Twilio</td><td>TWILIO_ACCOUNT_SID, AUTH_TOKEN</td><td>twilio.com console</td></tr>
+<tr><td>Anthropic</td><td>ANTHROPIC_API_KEY</td><td>console.anthropic.com (optional)</td></tr>
+</table>
+</div>
+
+<!-- ════════════════ 15. CHARGES ════════════════ -->
+<h2 id="s15"><span class="section-num">15.</span> Charges & Cost Structure</h2>
+
+<div class="code">Per round-trip (buy + sell):
+  Brokerage        = Rs.40 flat (Rs.20/order, Zerodha)
+  STT              = 0.0625% on sell-side turnover
+  GST              = 18% on brokerage
+  Stamp Duty       = 0.003% on buy-side turnover
+  SEBI Charges     = 0.0001% on total turnover
+  Exchange Txn     = 0.00053% on total turnover
+
+Typical per-trade: Rs.50-80 (NIFTY), Rs.30-50 (BANKNIFTY)
+Monthly (26 trades): ~Rs.700-900 in charges
+Kite Connect API: Rs.2,000/month</div>
+
+<!-- ════════════════ 16. LIMITATIONS & FUTURE ════════════════ -->
+<h2 id="s16"><span class="section-num">16.</span> Known Limitations & Future Work</h2>
+
+<div class="grid-2">
+<div class="card accent" style="--ac:#ef4444;">
+<h4>Current Limitations</h4>
+<ul>
+<li>Backtested on synthetic data only — real Kite historical data validation pending</li>
+<li>Momentum strategy consistently underperforms (20% WR) — needs redesign or removal</li>
+<li>BANKNIFTY removed from default due to poor synthetic data modeling</li>
+<li>No multi-timeframe analysis (only uses one candle interval)</li>
+<li>Greeks computed via Black-Scholes approximation (no actual IV surface)</li>
+<li>No options selling strategies (straddle/strangle)</li>
+<li>Paper trading mode not yet implemented</li>
+</ul>
+</div>
+<div class="card accent" style="--ac:#10b981;">
+<h4>Future Enhancements</h4>
+<ul>
+<li>Validate on 6+ months of real Kite historical data</li>
+<li>Add Telegram as alternative notification channel</li>
+<li>Multi-broker support (Dhan, Fyers as backup)</li>
+<li>Web dashboard with live monitoring (Flask + React)</li>
+<li>Sentiment analysis from news/Twitter</li>
+<li>IV percentile tracking for IV crush plays</li>
+<li>Options selling strategies (straddle, strangle, iron condor)</li>
+<li>Machine learning signal scoring (replace rule-based)</li>
+<li>WhatsApp paper trading mode ("MODE PAPER" / "MODE LIVE")</li>
+</ul>
+</div>
+</div>
+
+<div class="callout warn">
+<b>Regulatory Note:</b> For personal use, building your own algo is permitted under SEBI guidelines. If offering as a service, SEBI Research Analyst registration and exchange algo approval are required. Options trading involves substantial risk. This system is a tool, not guaranteed profit. Trade only with capital you can afford to lose.
+</div>
+
+<p style="text-align:center;color:#374151;margin-top:60px;font-size:0.82em;">
+  Nifty Options AI Agent &mdash; Product Documentation v4.0 &mdash; Last updated March 2026
+</p>
+
+</body>
+</html>

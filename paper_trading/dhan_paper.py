@@ -1,0 +1,422 @@
+#!/usr/bin/env python3
+"""
+Paper trading with Dhan — real market data, virtual orders.
+
+Setup:
+  1. Create free account at https://dhanhq.co
+  2. Go to API section, generate access token
+  3. Add to .env:
+     DHAN_CLIENT_ID=your_client_id
+     DHAN_ACCESS_TOKEN=your_access_token
+  4. Enable "Virtual Trading" in Dhan app settings
+
+Usage:
+  # Start live paper trading (polls every 2 min):
+  python -m paper_trading.dhan_paper --live
+
+  # Check status:
+  python -m paper_trading.dhan_paper --status
+
+  # Generate dashboard:
+  python -m paper_trading.dhan_paper --dashboard
+
+  # Reset:
+  python -m paper_trading.dhan_paper --reset
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import sys
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pandas as pd
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from paper_trading.versions import VERSION_CONFIG
+from paper_trading.dhan_broker import DhanBroker
+from strategy.indicators import atr, rsi
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+TRADES_DIR = Path("data/dhan_paper_trades")
+TRADES_DIR.mkdir(parents=True, exist_ok=True)
+
+CAPITAL_PER_VERSION = 50_000
+
+
+class DhanPaperTrader:
+    """Paper trader that uses Dhan API for real data + virtual orders."""
+
+    def __init__(self, version_id: str, detect_trend_fn, broker: DhanBroker,
+                 capital: float = 50_000):
+        self.version_id = version_id
+        self.detect_trend = detect_trend_fn
+        self.broker = broker
+        self.capital = capital
+        self.initial_capital = capital
+        self.trades = []
+        self.open_trade = None
+        self.trades_today = 0
+        self.last_trade_time = None
+        self.spot_buffer = pd.DataFrame()
+        self._load_state()
+
+    PARAMS = {
+        "min_trend_strength": 60, "min_bear_strength": 45,
+        "max_trend_strength": 92, "max_rsi_ce": 75,
+        "rsi_dead_zone_lo": 48, "rsi_dead_zone_hi": 57,
+        "max_trades_per_day": 2, "cooldown_minutes": 30,
+        "skip_first_minutes": 5, "avoid_days": [0, 4], "avoid_hours": [9, 12],
+        "min_sl_pct": 0.15, "atr_sl_multiplier": 1.5, "rr_ratio": 2.0,
+        "breakeven_trigger_pct": 20, "max_loss_per_trade": 2000,
+    }
+
+    def tick(self, current_time: datetime = None):
+        """Called every 2 minutes during market hours."""
+        if current_time is None:
+            current_time = datetime.now()
+
+        # Fetch latest spot data from Dhan
+        try:
+            spot_price = self.broker.get_spot_price("NIFTY")
+            logger.debug(f"[{self.version_id}] NIFTY spot: {spot_price:.2f}")
+        except Exception as e:
+            logger.error(f"[{self.version_id}] Spot fetch failed: {e}")
+            return None
+
+        # Add to buffer
+        new_row = pd.DataFrame([{
+            "date": current_time, "open": spot_price, "high": spot_price,
+            "low": spot_price, "close": spot_price, "volume": 100000,
+        }])
+        self.spot_buffer = pd.concat([self.spot_buffer, new_row], ignore_index=True)
+
+        # Keep last 500 candles
+        if len(self.spot_buffer) > 500:
+            self.spot_buffer = self.spot_buffer.iloc[-500:]
+
+        if self.open_trade:
+            return self._monitor_position(spot_price, current_time)
+
+        return self._scan_for_signal(spot_price, current_time)
+
+    def _scan_for_signal(self, spot_price: float, current_time: datetime):
+        """Run full gate check and generate signal."""
+        hour = current_time.hour
+        minute = current_time.minute
+        time_min = hour * 60 + minute
+
+        # Daily reset
+        if self.last_trade_time and self.last_trade_time.date() != current_time.date():
+            self.trades_today = 0
+
+        # Market hours
+        market_start = 9 * 60 + 15 + self.PARAMS["skip_first_minutes"]
+        if time_min < market_start or hour > 15 or (hour == 15 and minute > 15):
+            return None
+        if current_time.weekday() in self.PARAMS["avoid_days"]:
+            return None
+
+        afternoon_relaxed = (time_min >= 13 * 60 + 30 and self.trades_today == 0)
+        if not afternoon_relaxed and hour in self.PARAMS["avoid_hours"]:
+            return None
+        if self.trades_today >= self.PARAMS["max_trades_per_day"]:
+            return None
+        if self.last_trade_time:
+            if (current_time - self.last_trade_time).total_seconds() / 60 < self.PARAMS["cooldown_minutes"]:
+                return None
+
+        if len(self.spot_buffer) < 50:
+            return None
+
+        # Resample to 5-min for indicators
+        spot_5m = self.spot_buffer.set_index("date").resample("5min").agg({
+            "open": "first", "high": "max", "low": "min",
+            "close": "last", "volume": "sum"
+        }).dropna().reset_index()
+
+        if len(spot_5m) < 20:
+            return None
+
+        # Run version-specific trend detection
+        trend = self.detect_trend(spot_5m)
+
+        # Gates
+        if trend["direction"] == 0: return None
+        if trend["direction"] == 1 and trend["strength"] < self.PARAMS["min_trend_strength"]: return None
+        if trend["direction"] == -1 and (100 - trend["strength"]) < self.PARAMS["min_bear_strength"]: return None
+        if trend["direction"] == 1 and trend["strength"] > self.PARAMS["max_trend_strength"]: return None
+        if trend["direction"] == -1 and (100 - trend["strength"]) > self.PARAMS["max_trend_strength"]: return None
+
+        target_type = "CE" if trend["direction"] == 1 else "PE"
+        rsi_val = trend.get("rsi", 50)
+        if target_type == "CE" and rsi_val > self.PARAMS["max_rsi_ce"]: return None
+        if target_type == "PE" and rsi_val < 20: return None
+        if not afternoon_relaxed:
+            if self.PARAMS["rsi_dead_zone_lo"] <= rsi_val <= self.PARAMS["rsi_dead_zone_hi"]: return None
+
+        pa = trend.get("details", {}).get("price_action", "NEUTRAL")
+        if target_type == "CE" and pa != "BULL": return None
+        if target_type == "PE" and pa != "BEAR": return None
+
+        # ── Signal! Get real option data from Dhan ──
+        try:
+            chain = self.broker.get_option_chain("NIFTY")
+        except Exception as e:
+            logger.error(f"Option chain fetch failed: {e}")
+            chain = []
+
+        # Find best option near ATM
+        strike_step = 50
+        atm = round(spot_price / strike_step) * strike_step
+        target_strike = atm + strike_step if target_type == "CE" else atm - strike_step
+
+        # Try to get real LTP from chain
+        premium = None
+        security_id = ""
+        if chain:
+            for opt in chain:
+                if (opt.get("strikePrice") == target_strike and
+                    opt.get("optionType") == target_type):
+                    premium = opt.get("LTP", opt.get("lastPrice", 0))
+                    security_id = str(opt.get("securityId", ""))
+                    break
+
+        if not premium or premium < 50:
+            # Fallback: estimate premium
+            premium = max(50, abs(spot_price - target_strike) * 0.3 + 80)
+
+        # SL / Target
+        atr_val = atr(spot_5m, 14).iloc[-1] if len(spot_5m) >= 15 else 30
+        sl_points = atr_val * self.PARAMS["atr_sl_multiplier"] * 0.4
+        sl = round(max(premium - sl_points, premium * (1 - self.PARAMS["min_sl_pct"])), 2)
+        sl = max(sl, premium * 0.50)
+        risk = premium - sl
+        if risk <= 0: return None
+        target = round(premium + risk * self.PARAMS["rr_ratio"], 2)
+        qty = max(int(self.PARAMS["max_loss_per_trade"] / risk // 75) * 75, 75)
+
+        symbol = f"NIFTY{int(target_strike)}{target_type}"
+
+        # Place virtual order on Dhan (if security_id available)
+        order_id = ""
+        if security_id:
+            try:
+                result = self.broker.place_virtual_order(
+                    security_id=security_id,
+                    transaction_type="BUY",
+                    quantity=qty,
+                    order_type="MARKET",
+                )
+                order_id = result.get("data", {}).get("orderId", "")
+            except Exception as e:
+                logger.warning(f"Dhan virtual order failed (continuing as paper): {e}")
+
+        trade = {
+            "id": len(self.trades) + 1,
+            "version": self.version_id,
+            "symbol": symbol,
+            "security_id": security_id,
+            "type": target_type,
+            "entry_price": round(premium, 2),
+            "stop_loss": round(sl, 2),
+            "target": round(target, 2),
+            "quantity": qty,
+            "entry_time": current_time.isoformat(),
+            "spot_at_entry": round(spot_price, 2),
+            "trend_strength": trend["strength"],
+            "rsi": rsi_val,
+            "indicators": trend.get("details", {}),
+            "order_id": order_id,
+            "status": "OPEN",
+            "exit_price": None, "exit_time": None, "exit_reason": None, "pnl": None,
+        }
+
+        self.open_trade = trade
+        self.trades_today += 1
+        self.last_trade_time = current_time
+        self._save_state()
+
+        logger.info(f"[{self.version_id}] BUY {symbol} @ {premium:.2f} "
+                     f"SL={sl:.2f} TGT={target:.2f} Qty={qty} "
+                     f"Trend={trend['strength']:.0f}% Dhan={order_id or 'paper'}")
+        return trade
+
+    def _monitor_position(self, spot_price: float, current_time: datetime):
+        """Monitor open position using real spot data."""
+        t = self.open_trade
+        entry_spot = t["spot_at_entry"]
+        delta = 0.4 if t["type"] == "CE" else -0.4
+        est_premium = t["entry_price"] + (spot_price - entry_spot) * delta
+        est_premium = max(est_premium, 0.5)
+
+        # Try to get real option LTP
+        if t.get("security_id"):
+            try:
+                quote = self.broker.get_option_ltp(t["security_id"])
+                if quote and quote.get("LTP"):
+                    est_premium = quote["LTP"]
+            except Exception:
+                pass  # fall back to estimate
+
+        if est_premium <= t["stop_loss"]:
+            self._close_trade(t["stop_loss"], current_time, "SL_HIT")
+        elif est_premium >= t["target"]:
+            self._close_trade(t["target"], current_time, "TARGET_HIT")
+        elif current_time.hour == 15 and current_time.minute >= 15:
+            self._close_trade(est_premium, current_time, "EOD_SQUAREOFF")
+        else:
+            # Trailing SL
+            total_move = t["target"] - t["entry_price"]
+            current_move = est_premium - t["entry_price"]
+            if total_move > 0:
+                move_pct = current_move / total_move * 100
+                if move_pct >= self.PARAMS["breakeven_trigger_pct"]:
+                    t["stop_loss"] = max(t["stop_loss"], t["entry_price"])
+
+    def _close_trade(self, exit_price, exit_time, reason):
+        t = self.open_trade
+        t["exit_price"] = round(exit_price, 2)
+        t["exit_time"] = exit_time.isoformat()
+        t["exit_reason"] = reason
+        t["pnl"] = round((exit_price - t["entry_price"]) * t["quantity"], 2)
+        t["status"] = "CLOSED"
+        self.capital += t["pnl"]
+
+        # Place exit order on Dhan
+        if t.get("security_id"):
+            try:
+                self.broker.place_virtual_order(
+                    security_id=t["security_id"],
+                    transaction_type="SELL",
+                    quantity=t["quantity"],
+                    order_type="MARKET",
+                )
+            except Exception:
+                pass
+
+        self.trades.append(t)
+        self.open_trade = None
+        self._save_state()
+        logger.info(f"[{self.version_id}] SELL {t['symbol']} @ {exit_price:.2f} "
+                     f"{reason} P&L={t['pnl']:+,.0f} Capital={self.capital:,.0f}")
+
+    def _save_state(self):
+        state = {"version_id": self.version_id, "capital": self.capital,
+                 "initial_capital": self.initial_capital, "trades": self.trades,
+                 "open_trade": self.open_trade, "trades_today": self.trades_today,
+                 "last_trade_time": self.last_trade_time.isoformat() if self.last_trade_time else None}
+        with open(TRADES_DIR / f"{self.version_id}.json", "w") as f:
+            json.dump(state, f, indent=2, default=str)
+
+    def _load_state(self):
+        path = TRADES_DIR / f"{self.version_id}.json"
+        if path.exists():
+            with open(path) as f:
+                state = json.load(f)
+            self.capital = state.get("capital", self.initial_capital)
+            self.trades = state.get("trades", [])
+            self.open_trade = state.get("open_trade")
+            self.trades_today = state.get("trades_today", 0)
+            lt = state.get("last_trade_time")
+            self.last_trade_time = datetime.fromisoformat(lt) if lt else None
+
+    def get_summary(self):
+        closed = [t for t in self.trades if t["status"] == "CLOSED"]
+        winners = [t for t in closed if (t.get("pnl") or 0) > 0]
+        return {"version": self.version_id, "capital": round(self.capital, 2),
+                "pnl": round(self.capital - self.initial_capital, 2),
+                "roi": round((self.capital - self.initial_capital) / self.initial_capital * 100, 2),
+                "trades": len(closed), "winners": len(winners),
+                "losers": len(closed) - len(winners),
+                "win_rate": round(len(winners) / max(len(closed), 1) * 100, 1),
+                "open_trade": self.open_trade is not None}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Dhan Paper Trading")
+    parser.add_argument("--live", action="store_true", help="Start live paper trading")
+    parser.add_argument("--status", action="store_true", help="Show current status")
+    parser.add_argument("--dashboard", action="store_true", help="Generate dashboard")
+    parser.add_argument("--reset", action="store_true", help="Reset all trades")
+    parser.add_argument("--capital", type=float, default=50_000)
+    args = parser.parse_args()
+
+    if args.reset:
+        for f in TRADES_DIR.glob("*.json"):
+            f.unlink()
+        print("Dhan paper trades reset.")
+        return
+
+    if args.status:
+        for vid, cfg in VERSION_CONFIG.items():
+            path = TRADES_DIR / f"{vid}.json"
+            if path.exists():
+                with open(path) as f:
+                    state = json.load(f)
+                pnl = state["capital"] - state["initial_capital"]
+                closed = [t for t in state["trades"] if t["status"] == "CLOSED"]
+                wins = sum(1 for t in closed if (t.get("pnl") or 0) > 0)
+                wr = wins / max(len(closed), 1) * 100
+                print(f"  {cfg['name']}: Capital={state['capital']:,.0f} P&L={pnl:+,.0f} "
+                      f"Trades={len(closed)} WR={wr:.0f}%")
+        return
+
+    if args.live:
+        broker = DhanBroker()
+        traders = {}
+        for vid, cfg in VERSION_CONFIG.items():
+            detect_fn = cfg["detect_trend"]()
+            traders[vid] = DhanPaperTrader(vid, detect_fn, broker, args.capital)
+
+        logger.info(f"Starting Dhan paper trading — V1 + V2, Rs.{args.capital:,.0f} each")
+        logger.info("Polling every 2 minutes. Press Ctrl+C to stop.\n")
+
+        while True:
+            now = datetime.now()
+            if now.hour < 9 or (now.hour == 9 and now.minute < 15):
+                time.sleep(60); continue
+            if now.hour >= 16:
+                # Print EOD summary
+                for vid, trader in traders.items():
+                    s = trader.get_summary()
+                    logger.info(f"[{vid}] EOD: P&L={s['pnl']:+,.0f} Trades={s['trades']} WR={s['win_rate']}%")
+                time.sleep(3600); continue
+
+            for vid, trader in traders.items():
+                try:
+                    trader.tick(now)
+                except Exception as e:
+                    logger.error(f"[{vid}] Error: {e}")
+
+            # Status
+            for vid, trader in traders.items():
+                s = trader.get_summary()
+                status = "OPEN" if s["open_trade"] else "idle"
+                logger.info(f"  [{cfg['name'][:8]}] P&L={s['pnl']:+,.0f} | {s['trades']} trades | {status}")
+
+            time.sleep(120)  # 2 minutes
+
+    if args.dashboard:
+        from paper_trading.run import generate_dashboard
+        generate_dashboard()
+
+    parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

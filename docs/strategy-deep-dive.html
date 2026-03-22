@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strategy Deep Dive — Nifty Options AI Agent</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0e1a;color:#e0e0e0;padding:30px 40px;line-height:1.6;}
+@media(max-width:800px){body{padding:16px;}}
+h1{text-align:center;font-size:2.2em;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;}
+.subtitle{text-align:center;color:#6b7280;font-size:1em;margin-bottom:40px;}
+h2{color:#00d4ff;font-size:1.45em;margin:50px 0 16px;padding-bottom:8px;border-bottom:2px solid #1a2040;}
+h3{color:#a78bfa;font-size:1.1em;margin:28px 0 10px;}
+h4{color:#f59e0b;font-size:0.95em;margin:18px 0 8px;}
+p{color:#d1d5db;margin:8px 0;font-size:0.92em;}
+.section{margin:20px 0;}
+
+/* Cards */
+.card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:24px;margin:14px 0;}
+.card-accent{border-left:4px solid var(--accent,#3b82f6);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+/* Flow */
+.flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:20px 0;}
+.flow-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;}
+.flow-box{background:linear-gradient(135deg,#131830,#1a2240);border:1px solid #2a3460;border-radius:12px;padding:14px 20px;min-width:180px;text-align:center;position:relative;}
+.flow-box:hover{border-color:#00d4ff;transform:scale(1.02);transition:0.2s;}
+.flow-box .icon{font-size:1.5em;margin-bottom:4px;}
+.flow-box .title{font-weight:700;font-size:0.92em;color:#fff;}
+.flow-box .desc{font-size:0.78em;color:#9ca3af;margin-top:4px;}
+.flow-box.green{border-color:#10b981;} .flow-box.red{border-color:#ef4444;}
+.flow-box.blue{border-color:#3b82f6;} .flow-box.purple{border-color:#a78bfa;}
+.flow-box.orange{border-color:#f59e0b;} .flow-box.cyan{border-color:#06b6d4;}
+.arrow{color:#2a3460;font-size:1.8em;line-height:1;}
+.arrow-r{color:#2a3460;font-size:1.5em;}
+.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.72em;font-weight:700;margin:2px;}
+.badge-g{background:#064e3b;color:#10b981;} .badge-r{background:#450a0a;color:#ef4444;}
+.badge-b{background:#172554;color:#3b82f6;} .badge-o{background:#451a03;color:#f59e0b;}
+.badge-p{background:#2e1065;color:#a78bfa;}
+
+/* Gate diagram */
+.gate{display:flex;align-items:stretch;gap:0;margin:16px 0;}
+.gate-item{flex:1;background:#0f1629;border:1px solid #253050;padding:14px;text-align:center;position:relative;}
+.gate-item:first-child{border-radius:10px 0 0 10px;}
+.gate-item:last-child{border-radius:0 10px 10px 0;}
+.gate-item .gn{font-weight:800;color:#00d4ff;font-size:0.82em;margin-bottom:4px;}
+.gate-item .gt{font-size:0.78em;color:#e0e0e0;font-weight:600;}
+.gate-item .gd{font-size:0.7em;color:#6b7280;margin-top:4px;}
+.gate-item.pass{border-color:#10b981;} .gate-item.fail{border-color:#ef4444;}
+.gate-arrow{display:flex;align-items:center;color:#253050;font-size:1.2em;padding:0 2px;}
+
+/* Code block */
+.code{background:#0a0f1e;border:1px solid #1a2545;border-radius:8px;padding:14px 16px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:0.82em;color:#7dd3fc;margin:10px 0;overflow-x:auto;white-space:pre-wrap;line-height:1.5;}
+
+/* Indicator cards */
+.ind-card{background:linear-gradient(135deg,#0f1629,#151d35);border:1px solid #253050;border-radius:10px;padding:16px;position:relative;overflow:hidden;}
+.ind-card::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--c,#3b82f6);}
+.ind-card .ind-name{font-weight:700;font-size:1em;color:#fff;margin-bottom:2px;}
+.ind-card .ind-type{font-size:0.7em;color:var(--c,#3b82f6);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.ind-card .ind-desc{font-size:0.82em;color:#9ca3af;}
+
+/* SL stages */
+.sl-track{position:relative;margin:20px 0;padding:10px 0;}
+.sl-bar{height:12px;background:#1a2240;border-radius:6px;position:relative;overflow:visible;}
+.sl-fill{height:100%;border-radius:6px;position:absolute;top:0;left:0;}
+.sl-marker{position:absolute;top:-22px;font-size:0.72em;font-weight:700;transform:translateX(-50%);}
+.sl-marker::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:2px;height:8px;}
+
+/* Table */
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:0.85em;}
+th{background:#1a2240;color:#00d4ff;padding:10px 12px;text-align:left;}
+td{padding:9px 12px;border-bottom:1px solid #1a2040;}
+tr:hover td{background:#131830;}
+.pnl-pos{color:#10b981;font-weight:600;} .pnl-neg{color:#ef4444;font-weight:600;}
+
+/* Comparison */
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:start;margin:14px 0;}
+.vs-mid{text-align:center;color:#374151;font-size:1.5em;font-weight:800;padding-top:30px;}
+</style>
+</head>
+<body>
+
+<h1>Strategy Deep Dive</h1>
+<p class="subtitle">Complete guide to every strategy, gate, indicator, and parameter used by the trading agent</p>
+
+<!-- ========================================================== -->
+<h2>1. Master Flow — From Market Open to Trade Exit</h2>
+
+<div class="flow">
+  <div class="flow-box cyan">
+    <div class="icon">9:15</div>
+    <div class="title">Market Opens</div>
+    <div class="desc">System starts scanning after configurable skip period<br>NIFTY: skip 5 min | BANKNIFTY: skip 30 min</div>
+  </div>
+  <div class="arrow">&#11015;</div>
+  <div class="flow-box purple">
+    <div class="icon">&#128269;</div>
+    <div class="title">Scan Every 15 Min</div>
+    <div class="desc">Fetch option chain for both NIFTY &amp; BANKNIFTY<br>Filter ATM &plusmn; 10 strikes, premium 50-500</div>
+  </div>
+  <div class="arrow">&#11015;</div>
+
+  <div class="card" style="width:100%;max-width:900px;border-color:#f59e0b;">
+    <h3 style="margin-top:0;color:#f59e0b;">7-Gate Filter (must pass ALL)</h3>
+    <div class="gate">
+      <div class="gate-item"><div class="gn">GATE 1</div><div class="gt">Trend Direction</div><div class="gd">Bull &ge;60% or Bear &ge;55%</div></div>
+      <div class="gate-arrow">&#10132;</div>
+      <div class="gate-item"><div class="gn">GATE 1b</div><div class="gt">Not Exhausted</div><div class="gd">Strength &lt; 92%</div></div>
+      <div class="gate-arrow">&#10132;</div>
+      <div class="gate-item"><div class="gn">GATE 2</div><div class="gt">RSI Guard</div><div class="gd">CE: RSI&lt;75 (BNF:68)<br>PE: RSI&gt;20</div></div>
+      <div class="gate-arrow">&#10132;</div>
+      <div class="gate-item"><div class="gn">GATE 3</div><div class="gt">Momentum</div><div class="gd">Last 3 candles move<br>in trend direction</div></div>
+      <div class="gate-arrow">&#10132;</div>
+      <div class="gate-item"><div class="gn">GATE 4</div><div class="gt">Daily Limit</div><div class="gd">Max 2 trades/day<br>per underlying</div></div>
+      <div class="gate-arrow">&#10132;</div>
+      <div class="gate-item"><div class="gn">GATE 5</div><div class="gt">Cooldown</div><div class="gd">30 min gap between trades</div></div>
+      <div class="gate-arrow">&#10132;</div>
+      <div class="gate-item"><div class="gn">GATE 6</div><div class="gt">Risk Check</div><div class="gd">Daily loss limit<br>Max open positions</div></div>
+    </div>
+  </div>
+  <div class="arrow">&#11015;</div>
+
+  <div class="flow-h">
+    <div class="flow-box blue">
+      <div class="title">Strategy 1: Momentum</div>
+      <div class="desc">High score + volume &gt; 10K<br>ATR-based SL + R:R target</div>
+    </div>
+    <div style="color:#374151;font-weight:800;">OR</div>
+    <div class="flow-box blue">
+      <div class="title">Strategy 2: OI Reversal</div>
+      <div class="desc">High OI &gt; 200K confirms<br>support/resistance level</div>
+    </div>
+  </div>
+  <div class="arrow">&#11015;</div>
+
+  <div class="flow-box green">
+    <div class="icon">&#9989;</div>
+    <div class="title">Signal Generated</div>
+    <div class="desc">Entry price, SL, Target, Qty calculated<br>WhatsApp alert sent (live mode)</div>
+  </div>
+  <div class="arrow">&#11015;</div>
+
+  <div class="flow-box orange">
+    <div class="icon">&#128065;</div>
+    <div class="title">Position Monitored Every Tick</div>
+    <div class="desc">4-stage trailing SL + partial profit booking<br>Time exits + max holding check</div>
+  </div>
+  <div class="arrow">&#11015;</div>
+
+  <div class="flow-h">
+    <div class="flow-box green"><div class="title">Target Hit</div></div>
+    <div class="flow-box orange"><div class="title">Trailing SL</div></div>
+    <div class="flow-box red"><div class="title">SL Hit</div></div>
+    <div class="flow-box purple"><div class="title">EOD Exit</div></div>
+    <div class="flow-box cyan"><div class="title">Max Hold</div></div>
+  </div>
+</div>
+
+<!-- ========================================================== -->
+<h2>2. Strategy 1: Momentum Breakout</h2>
+
+<div class="card card-accent" style="--accent:#3b82f6;">
+<h4>Core Logic</h4>
+<p>Buy options in the direction of the current trend when a high-scoring, liquid option is found with sufficient volume. The trend must be confirmed by 4+ technical indicators, but NOT fully exhausted (capped at 92% strength). Entry is only taken if the last 3 price candles are actually moving in the trend direction (momentum confirmation).</p>
+
+<h4>When It Triggers</h4>
+<div class="code">IF trend_direction == BULLISH and 60% &le; strength &lt; 92%:
+    Buy CE (Call) near ATM
+
+IF trend_direction == BEARISH and 55% &le; bear_agreement &lt; 92%:
+    Buy PE (Put) near ATM
+
+REQUIREMENTS:
+    - Volume &gt; 10,000 contracts
+    - Score &ge; 50/100
+    - Premium between 50 and 500 (BANKNIFTY max 500)
+    - RSI not overbought (CE: &lt;75 NIFTY, &lt;68 BANKNIFTY)
+    - RSI not oversold (PE: &gt;20)
+    - Last 3 candles moving in trend direction</div>
+
+<h4>Stop Loss Calculation</h4>
+<div class="code">SL = Entry - (ATR &times; multiplier &times; estimated_delta)
+
+Where:
+    ATR = 14-period Average True Range of spot
+    multiplier = 1.5 (NIFTY) or 3.0 (BANKNIFTY)
+    estimated_delta = 0.4 (slightly OTM approximation)
+
+FLOOR: SL never tighter than min_sl_pct of premium
+    NIFTY: min 10% of premium
+    BANKNIFTY: min 15% of premium
+
+CAP: SL never wider than 50% of premium</div>
+
+<h4>Target Calculation</h4>
+<div class="code">risk = Entry - SL
+Target = Entry + (risk &times; R:R ratio)
+
+R:R ratio:
+    NIFTY: 2.0 (need 2x the risk as reward)
+    BANKNIFTY: 1.5 (faster profit taking on volatile instrument)</div>
+
+<h4>Position Sizing</h4>
+<div class="code">max_units = MAX_LOSS_PER_TRADE / risk_per_unit
+lots = floor(max_units / lot_size)
+lots = max(lots, 1)    # minimum 1 lot
+quantity = lots &times; lot_size
+
+MAX_LOSS_PER_TRADE = Rs.2,000</div>
+</div>
+
+<!-- ========================================================== -->
+<h2>3. Strategy 2: OI Reversal</h2>
+
+<div class="card card-accent" style="--accent:#10b981;">
+<h4>Core Logic</h4>
+<p>When massive Open Interest builds up at a strike, option writers are defending that level. High Put OI at a strike means writers sold puts there and will defend it (support). High Call OI means resistance. This strategy buys options at levels where OI confirms the trend direction — it's essentially a "smart money is on your side" signal.</p>
+
+<h4>When It Triggers</h4>
+<div class="code">BULLISH TREND + High Put OI (&gt;200K) at nearby strike:
+    Writers sold PUTs = defending that level as support
+    &rarr; Buy CE near that strike (bullish confirmation)
+
+BEARISH TREND + High Call OI (&gt;200K) at nearby strike:
+    Writers sold CALLs = defending that level as resistance
+    &rarr; Buy PE near that strike (bearish confirmation)
+
+Same SL/target/sizing rules as Momentum strategy</div>
+
+<h4>Why OI Works</h4>
+<div class="grid-3">
+  <div class="ind-card" style="--c:#10b981;">
+    <div class="ind-name">High Put OI = Support</div>
+    <div class="ind-desc">Writers sold puts at this strike. If price falls to this level, their puts become risky. They'll buy futures to hedge, pushing price UP. This creates a floor.</div>
+  </div>
+  <div class="ind-card" style="--c:#ef4444;">
+    <div class="ind-name">High Call OI = Resistance</div>
+    <div class="ind-desc">Writers sold calls at this strike. If price rises to this level, their calls become risky. They'll sell futures to hedge, pushing price DOWN. This creates a ceiling.</div>
+  </div>
+  <div class="ind-card" style="--c:#f59e0b;">
+    <div class="ind-name">OI Buildup = Conviction</div>
+    <div class="ind-desc">Rising OI means NEW positions being created (not just rollovers). This shows fresh money betting on that level holding. The higher the OI, the stronger the level.</div>
+  </div>
+</div>
+</div>
+
+<!-- ========================================================== -->
+<h2>4. The 6 Indicators — Trend Detection Engine</h2>
+
+<p>The trend detector runs 6 independent indicators and aggregates their votes. Each indicator says BULL, BEAR, or NEUTRAL. The percentage of bullish votes determines the trend direction and strength.</p>
+
+<div class="grid-2">
+  <div class="ind-card" style="--c:#3b82f6;">
+    <div class="ind-type">Indicator 1</div>
+    <div class="ind-name">EMA Crossover (5/13)</div>
+    <div class="ind-desc">
+      <strong>What:</strong> Exponential Moving Average of last 5 candles vs last 13 candles.<br>
+      <strong>Signal:</strong> EMA 5 &gt; EMA 13 = BULL (short-term momentum is up). EMA 5 &lt; EMA 13 = BEAR.<br>
+      <strong>Why 5/13:</strong> Faster than traditional 9/21. Catches trend reversals earlier, especially important for BANKNIFTY's short intraday trends.<br>
+      <strong>Weakness:</strong> Whipsaws in sideways markets. That's why we need 4+ indicators to agree.
+    </div>
+  </div>
+
+  <div class="ind-card" style="--c:#10b981;">
+    <div class="ind-type">Indicator 2</div>
+    <div class="ind-name">Price vs EMA 20</div>
+    <div class="ind-desc">
+      <strong>What:</strong> Is current price above or below the 20-period EMA?<br>
+      <strong>Signal:</strong> Price &gt; EMA 20 = BULL (price is above its recent average). Price &lt; EMA 20 = BEAR.<br>
+      <strong>Why 20:</strong> Shorter than traditional EMA 50 to detect bearish trends faster. EMA 50 was too slow — by the time it flagged bear, RSI was already at 15 and the move was over.<br>
+      <strong>Strength:</strong> Simple, reliable, rarely gives false signals on strong trends.
+    </div>
+  </div>
+
+  <div class="ind-card" style="--c:#a78bfa;">
+    <div class="ind-type">Indicator 3</div>
+    <div class="ind-name">RSI (14-period)</div>
+    <div class="ind-desc">
+      <strong>What:</strong> Relative Strength Index — measures speed and magnitude of price changes (0-100 scale).<br>
+      <strong>Signal:</strong> RSI &gt; 55 = BULL. RSI &lt; 45 = BEAR. 45-55 = NEUTRAL.<br>
+      <strong>Why 55/45:</strong> Wider than traditional 60/40 so RSI contributes direction more often. The old 60/40 made RSI say NEUTRAL too much, weakening bear detection.<br>
+      <strong>Also used as:</strong> Entry guard — blocks CE when RSI &gt; 75 (NIFTY) / 68 (BANKNIFTY) to avoid buying into exhausted trends.
+    </div>
+  </div>
+
+  <div class="ind-card" style="--c:#f59e0b;">
+    <div class="ind-type">Indicator 4</div>
+    <div class="ind-name">MACD (12/26/9)</div>
+    <div class="ind-desc">
+      <strong>What:</strong> Moving Average Convergence Divergence — difference between fast and slow EMAs, with a signal line.<br>
+      <strong>Signal:</strong> MACD histogram &gt; 0 = BULL (fast EMA pulling away from slow = accelerating momentum). Histogram &lt; 0 = BEAR.<br>
+      <strong>Strength:</strong> Excellent at detecting momentum shifts. When histogram flips from negative to positive, it's often the START of a move, not the end.<br>
+      <strong>Displayed in dashboard:</strong> Green/red histogram bars + MACD/signal lines.
+    </div>
+  </div>
+
+  <div class="ind-card" style="--c:#ef4444;">
+    <div class="ind-type">Indicator 5</div>
+    <div class="ind-name">Supertrend (7, 2.5)</div>
+    <div class="ind-desc">
+      <strong>What:</strong> Volatility-based trend following indicator. Plots a line above (bearish) or below (bullish) price based on ATR.<br>
+      <strong>Signal:</strong> Price above Supertrend line = BULL. Price below = BEAR. The line flips when price crosses it.<br>
+      <strong>Why period=7, mult=2.5:</strong> Faster than default (10, 3.0) to catch reversals. The lower multiplier makes it more sensitive to trend changes.<br>
+      <strong>Displayed in dashboard:</strong> Dashed green/red line on the spot chart.
+    </div>
+  </div>
+
+  <div class="ind-card" style="--c:#06b6d4;">
+    <div class="ind-type">Indicator 6</div>
+    <div class="ind-name">Price Action (3-candle slope)</div>
+    <div class="ind-desc">
+      <strong>What:</strong> Are the last 3 closing prices rising or falling?<br>
+      <strong>Signal:</strong> Last close &gt; close 3 bars ago (by &gt;0.02%) = BULL. Last close &lt; close 3 bars ago = BEAR. Otherwise NEUTRAL.<br>
+      <strong>Why it matters:</strong> All other indicators are LAGGING — they use historical averages. This one is IMMEDIATE. It catches the actual price direction right now.<br>
+      <strong>Also used as:</strong> Momentum confirmation gate (GATE 3). Even if 5 indicators say BULL, if the last 3 candles are falling, we skip the trade.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h4>How Votes Are Aggregated</h4>
+  <div class="code">bull_pct = (bullish_votes / total_indicators) &times; 100
+bear_pct = 100 - bull_pct
+
+Direction:
+    bull_pct &ge; 60%  &rarr;  BULLISH   (at least 3.6 out of 6 indicators)
+    bear_pct &ge; 55%  &rarr;  BEARISH   (lower bar because bear signals lag more)
+    otherwise         &rarr;  NEUTRAL   (no trade)
+
+NEUTRAL votes (RSI 45-55, price action flat) count as 0.5 bullish.
+
+Exhaustion filter:
+    If bull_pct &gt; 92% or bear_pct &gt; 92%, SKIP.
+    When ALL indicators agree, the trend is likely ENDING, not beginning.</div>
+
+  <h4>Why Asymmetric Thresholds (60% bull vs 55% bear)?</h4>
+  <p>Bearish signals are inherently harder to generate from lagging indicators. By the time EMA, Supertrend, and MACD all flip bearish, the RSI is already at 15-25 (extremely oversold) and the downtrend is exhausting. Lowering the bear threshold to 55% lets us catch bearish trends while there's still room to profit.</p>
+</div>
+
+<!-- ========================================================== -->
+<h2>5. The 7-Gate Filter System</h2>
+
+<p>Every potential trade must pass ALL 7 gates before execution. Each gate has a specific job — together they eliminate 85%+ of bad setups.</p>
+
+<div class="card card-accent" style="--accent:#ef4444;">
+<table>
+  <tr><th>Gate</th><th>Name</th><th>Check</th><th>Why It Exists</th><th>What It Prevents</th></tr>
+  <tr>
+    <td><span class="badge badge-b">1</span></td>
+    <td><strong>Trend Direction</strong></td>
+    <td>Bull &ge;60% or Bear &ge;55%</td>
+    <td>Only trade WITH confirmed trend</td>
+    <td>Random entries in choppy markets (was causing 40% of losses)</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-b">1b</span></td>
+    <td><strong>Exhaustion Filter</strong></td>
+    <td>Strength &lt; 92%</td>
+    <td>Avoid buying at end of move</td>
+    <td>100% agreement = mature trend. Data showed losers had HIGHER trend strength (92%) than winners (69%)</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-p">2</span></td>
+    <td><strong>RSI Guard</strong></td>
+    <td>CE: RSI &lt; 75/68<br>PE: RSI &gt; 20</td>
+    <td>Don't buy into overbought/oversold</td>
+    <td>9 losers entered with RSI &gt; 65 in original version. BANKNIFTY uses tighter 68 because it reverses faster</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-g">3</span></td>
+    <td><strong>Momentum Confirmation</strong></td>
+    <td>Last 3 candles in trend direction</td>
+    <td>Verify price is ACTUALLY moving</td>
+    <td>33/42 losers in V1 hit SL in 5 min with zero profit — trend said bull but price was falling at entry</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-o">4</span></td>
+    <td><strong>Daily Trade Limit</strong></td>
+    <td>Max 2 trades/day per underlying</td>
+    <td>Quality over quantity</td>
+    <td>Overtrading — old system did 6.7 trades/day, most were noise. Limiting to 2 forces picking only the best</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-o">5</span></td>
+    <td><strong>Cooldown Period</strong></td>
+    <td>30 min gap between trades</td>
+    <td>Don't re-enter after a loss</td>
+    <td>Revenge trading — getting stopped out then immediately re-entering the same noisy market</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-r">6</span></td>
+    <td><strong>Risk Check</strong></td>
+    <td>Daily P&L &gt; -5K<br>Open positions &lt; 2</td>
+    <td>Capital preservation</td>
+    <td>Catastrophic loss days. If you've lost Rs.5,000 today, stop. Come back tomorrow.</td>
+  </tr>
+</table>
+</div>
+
+<!-- ========================================================== -->
+<h2>6. Scoring Engine — Setup Ranking (0-100)</h2>
+
+<div class="card">
+<p>After gates pass, options are scored to pick the BEST setup. Score determines which option to trade, not WHETHER to trade (that's the gates' job).</p>
+
+<table>
+  <tr><th>Component</th><th>Max Score</th><th>What It Measures</th><th>Scoring Logic</th></tr>
+  <tr>
+    <td><strong>Trend Alignment</strong></td>
+    <td>25 pts</td>
+    <td>How strongly indicators agree</td>
+    <td>&ge;83% = 25 | &ge;66% = 15 | &ge;50% = 5</td>
+  </tr>
+  <tr>
+    <td><strong>Open Interest</strong></td>
+    <td>20 pts</td>
+    <td>How many contracts outstanding</td>
+    <td>&gt;1M = 20 | &gt;500K = 15 | &gt;100K = 10 | &gt;50K = 5</td>
+  </tr>
+  <tr>
+    <td><strong>Moneyness</strong></td>
+    <td>15 pts</td>
+    <td>How far from ATM</td>
+    <td>0.5-2% OTM = 15 | &lt;4% = 10 (slightly OTM preferred — best leverage)</td>
+  </tr>
+  <tr>
+    <td><strong>Volume</strong></td>
+    <td>15 pts</td>
+    <td>Contracts traded today</td>
+    <td>&gt;100K = 15 | &gt;50K = 10 | &gt;10K = 5</td>
+  </tr>
+  <tr>
+    <td><strong>Premium Level</strong></td>
+    <td>10 pts</td>
+    <td>Option price range</td>
+    <td>Rs.100-500 = 10 | Rs.50-1000 = 5 (sweet spot for risk/reward)</td>
+  </tr>
+  <tr>
+    <td><strong>Volume/OI Ratio</strong></td>
+    <td>10 pts</td>
+    <td>Smart money activity</td>
+    <td>0.1-0.5 = 10 | &lt;1.0 = 5 (high ratio = active trading = institutional interest)</td>
+  </tr>
+  <tr style="background:#1a2240;">
+    <td><strong>TOTAL</strong></td>
+    <td><strong>95 pts</strong></td>
+    <td colspan="2"><strong>Minimum threshold: 50 to qualify</strong></td>
+  </tr>
+</table>
+</div>
+
+<!-- ========================================================== -->
+<h2>7. Exit Logic — 4-Stage Trailing SL + Partial Profits</h2>
+
+<div class="card card-accent" style="--accent:#f59e0b;">
+<h4>Exit Priority (checked every tick)</h4>
+<table>
+  <tr><th>Priority</th><th>Condition</th><th>Action</th></tr>
+  <tr><td>1 (highest)</td><td>Price &le; Trailing SL</td><td>Immediate market exit</td></tr>
+  <tr><td>2</td><td>EOD 3:15 PM</td><td>Square off all MIS positions</td></tr>
+  <tr><td>3</td><td>50% of target reached + qty &gt; 1 lot</td><td>Exit 50% quantity, trail SL to breakeven</td></tr>
+  <tr><td>4</td><td>Price &ge; Target + held &ge; 2 candles</td><td>Full exit at target</td></tr>
+  <tr><td>5</td><td>Trailing SL stages (see below)</td><td>Tighten SL progressively</td></tr>
+  <tr><td>6</td><td>Held &gt; 2 hours with &lt; 10% profit</td><td>Exit (theta is eating premium)</td></tr>
+</table>
+
+<h4>4-Stage Trailing Stop Loss</h4>
+<div class="code">total_move = Target - Entry
+current_move = Current Price - Entry
+move_pct = (current_move / total_move) &times; 100
+
+Stage 1: move_pct &ge; 30% (NIFTY) / 20% (BANKNIFTY)
+    &rarr; Trail SL to BREAKEVEN (Entry price)
+    &rarr; Trade is now risk-free
+
+Stage 2: move_pct &ge; 50%
+    &rarr; Trail SL to Entry + 30% of current_move
+    &rarr; Lock in 30% of unrealized profit
+
+Stage 3: move_pct &ge; 70%
+    &rarr; Trail SL to Entry + 50% of current_move
+    &rarr; Lock in 50% of unrealized profit
+
+Stage 4: move_pct &ge; 85%
+    &rarr; Trail SL to Entry + 70% of current_move
+    &rarr; Lock in 70% — let the last 30% run to target
+
+Example (NIFTY CE, Entry=200, SL=170, Target=260):
+    total_move = 60
+    Price hits 218 (30%): SL trails from 170 &rarr; 200 (breakeven)
+    Price hits 230 (50%): SL trails to 200 + 30&times;0.3 = 209
+    Price hits 242 (70%): SL trails to 200 + 42&times;0.5 = 221
+    Price hits 251 (85%): SL trails to 200 + 51&times;0.7 = 235.7</div>
+
+<h4>Partial Profit Booking</h4>
+<div class="code">When price reaches 50% of target move AND quantity &gt; 1 lot:
+    Exit 50% of position at market
+    Move SL to breakeven on remaining
+    Let remaining 50% ride to full target
+
+Why: Data showed winners only captured 68% of max possible profit.
+     Partial exit locks guaranteed profit while keeping upside.</div>
+</div>
+
+<!-- ========================================================== -->
+<h2>8. NIFTY vs BANKNIFTY — Per-Underlying Tuning</h2>
+
+<div class="vs">
+  <div class="card" style="border-color:#3b82f6;">
+    <h3 style="color:#3b82f6;margin-top:0;">NIFTY</h3>
+    <table>
+      <tr><td>ATR SL Multiplier</td><td><strong>1.5</strong></td></tr>
+      <tr><td>Min SL %</td><td><strong>10%</strong> of premium</td></tr>
+      <tr><td>Max Premium</td><td><strong>No cap</strong></td></tr>
+      <tr><td>R:R Ratio</td><td><strong>2.0</strong> (target = 2x risk)</td></tr>
+      <tr><td>Breakeven Trigger</td><td><strong>30%</strong> of target</td></tr>
+      <tr><td>RSI Cap (CE)</td><td><strong>75</strong></td></tr>
+      <tr><td>Skip First</td><td><strong>5 min</strong> (start 9:20)</td></tr>
+      <tr><td>5-min Range</td><td>~20 pts</td></tr>
+      <tr><td>Lot Size</td><td>75 units</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:0.82em;color:#9ca3af;">NIFTY is smoother, trends last longer. Can afford wider targets (2.0 R:R) and tighter SL. Less opening noise so can start trading earlier.</p>
+  </div>
+
+  <div class="vs-mid">vs</div>
+
+  <div class="card" style="border-color:#f59e0b;">
+    <h3 style="color:#f59e0b;margin-top:0;">BANKNIFTY</h3>
+    <table>
+      <tr><td>ATR SL Multiplier</td><td><strong>3.0</strong> (2x wider)</td></tr>
+      <tr><td>Min SL %</td><td><strong>15%</strong> of premium</td></tr>
+      <tr><td>Max Premium</td><td><strong>500</strong> (no deep ITM)</td></tr>
+      <tr><td>R:R Ratio</td><td><strong>1.5</strong> (grab profits faster)</td></tr>
+      <tr><td>Breakeven Trigger</td><td><strong>20%</strong> (faster risk-free)</td></tr>
+      <tr><td>RSI Cap (CE)</td><td><strong>68</strong> (tighter)</td></tr>
+      <tr><td>Skip First</td><td><strong>30 min</strong> (start 9:45)</td></tr>
+      <tr><td>5-min Range</td><td>~40 pts (2x NIFTY)</td></tr>
+      <tr><td>Lot Size</td><td>30 units</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:0.82em;color:#9ca3af;">BANKNIFTY is 2.2x more volatile. Needs wider SL so noise doesn't stop you out, lower R:R target because it reverses faster, and avoids deep ITM options where SL% becomes tiny (3-5%).</p>
+  </div>
+</div>
+
+<div class="card">
+  <h4>Why These Specific Values?</h4>
+  <p>Every parameter was found by running parameter sweeps on 90 days of data:</p>
+  <div class="code">python -m backtest.run_backtest --synthetic --days 90 --underlying BANKNIFTY \
+    --sweep atr_sl_multiplier 1.5 3.0 0.5
+
+Results:
+    ATR  R:R  Trades  WR     P&L      Sharpe   PF
+    2.0  1.5      10  60%  +7,165     2.77   2.57  &larr; BEST
+    1.5  1.5      10  50%  +6,130     1.69   1.93
+    3.0  1.5      10  50%  +4,446     1.33   1.54
+    2.0  2.0      10  20%    -705    -0.28   0.88
+    2.0  2.5      10  20%  -1,307    -0.54   0.77</div>
+</div>
+
+<!-- ========================================================== -->
+<h2>9. Risk Management Rules</h2>
+
+<div class="grid-2">
+  <div class="card card-accent" style="--accent:#ef4444;">
+    <h4 style="color:#ef4444;">Hard Limits (Never Violated)</h4>
+    <table>
+      <tr><td>Max loss per trade</td><td><strong>Rs.2,000</strong></td></tr>
+      <tr><td>Max loss per day</td><td><strong>Rs.5,000</strong> (stop all trading)</td></tr>
+      <tr><td>Max open positions</td><td><strong>2</strong> per underlying</td></tr>
+      <tr><td>Max trades per day</td><td><strong>2</strong> per underlying</td></tr>
+      <tr><td>Min R:R ratio</td><td><strong>1.5</strong></td></tr>
+      <tr><td>Min premium</td><td><strong>Rs.50</strong> (below = illiquid)</td></tr>
+      <tr><td>Max premium (BNF)</td><td><strong>Rs.500</strong></td></tr>
+    </table>
+  </div>
+
+  <div class="card card-accent" style="--accent:#f59e0b;">
+    <h4 style="color:#f59e0b;">Position Sizing</h4>
+    <div class="code">risk_per_unit = |Entry - SL|
+max_units = 2000 / risk_per_unit
+lots = floor(max_units / lot_size)
+lots = max(lots, 1)
+qty = lots &times; lot_size
+
+Example:
+  Entry=200, SL=170, lot=75
+  risk/unit = 30
+  max_units = 2000/30 = 66
+  lots = floor(66/75) = 0 &rarr; 1
+  qty = 75
+  max loss = 30 &times; 75 = Rs.2,250</div>
+  </div>
+</div>
+
+<!-- ========================================================== -->
+<h2>10. Charges Calculation</h2>
+
+<div class="card">
+<div class="code">Per round-trip (buy + sell):
+    Brokerage      = Rs.40 flat (Rs.20 per order, Zerodha)
+    STT            = 0.0625% on sell-side turnover
+    GST            = 18% on brokerage
+    Stamp Duty     = 0.003% on buy-side turnover
+    SEBI Charges   = 0.0001% on total turnover
+    Exchange Txn   = 0.00053% on total turnover
+
+Typical total charges per trade:
+    Rs.50-80 for NIFTY options
+    Rs.30-50 for BANKNIFTY options (smaller lot size)</div>
+</div>
+
+<!-- ========================================================== -->
+<h2>11. Evolution — How We Got Here</h2>
+
+<div class="card">
+<table>
+  <tr><th>Version</th><th>Win Rate</th><th>Sharpe</th><th>Key Change</th><th>Problem Solved</th></tr>
+  <tr>
+    <td><span class="badge badge-r">V0</span></td>
+    <td>10.8%</td><td>Negative</td>
+    <td>No filters, scan every candle</td>
+    <td>Baseline — everything wrong</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-o">V1</span></td>
+    <td>43.7%</td><td>5.81</td>
+    <td>Added trend filter + ATR SL + cooldown</td>
+    <td>Stopped trading against the trend</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-b">V2</span></td>
+    <td>53.5%</td><td>5.67</td>
+    <td>Partial profits + 4-stage trailing + time/day filters</td>
+    <td>Stopped giving back 32% of winner profits</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-p">V3</span></td>
+    <td>53.3%</td><td>4.38</td>
+    <td>PE support + faster indicators + asymmetric thresholds</td>
+    <td>PE never fired (0 trades). Fixed bear detection lag</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-g">V4 (current)</span></td>
+    <td>60.6%</td><td>3.97</td>
+    <td>BANKNIFTY tuning (ATR 3.0, RR 1.5, max premium 500, min SL 15%)</td>
+    <td>BANKNIFTY instant SL hits — SL was smaller than one candle's range</td>
+  </tr>
+</table>
+</div>
+
+<p style="text-align:center;color:#374151;margin-top:50px;font-size:0.8em;">
+  Nifty Options AI Agent &mdash; Strategy Documentation &mdash; Built with Python 3.11+ &mdash; Kite Connect + Claude API
+</p>
+
+</body>
+</html>

@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nifty Options AI Agent — System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0a0e1a; color: #e0e0e0; padding: 40px; }
+  h1 { text-align: center; font-size: 2.2em; margin-bottom: 10px; background: linear-gradient(135deg, #00d4ff, #7b2ff7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  h2 { font-size: 1.5em; margin: 40px 0 20px; color: #00d4ff; border-bottom: 2px solid #1a2040; padding-bottom: 10px; }
+  h3 { font-size: 1.15em; margin: 25px 0 12px; color: #a78bfa; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 50px; font-size: 1.1em; }
+
+  /* ── Main Flow Diagram ── */
+  .flow-container { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 30px 0; }
+  .flow-row { display: flex; align-items: center; gap: 16px; }
+  .flow-box {
+    background: linear-gradient(135deg, #131830, #1a2240);
+    border: 1px solid #2a3460;
+    border-radius: 14px; padding: 18px 24px;
+    min-width: 220px; text-align: center;
+    position: relative; transition: transform 0.2s;
+  }
+  .flow-box:hover { transform: scale(1.03); border-color: #00d4ff; }
+  .flow-box .icon { font-size: 1.8em; margin-bottom: 6px; }
+  .flow-box .title { font-weight: 700; font-size: 1em; color: #fff; }
+  .flow-box .desc { font-size: 0.82em; color: #999; margin-top: 4px; }
+  .flow-box .time { font-size: 0.75em; color: #00d4ff; margin-top: 6px; font-weight: 600; }
+  .arrow-down { font-size: 2em; color: #2a3460; text-align: center; line-height: 1; }
+  .arrow-right { font-size: 2em; color: #2a3460; }
+  .flow-box.green { border-color: #10b981; }
+  .flow-box.orange { border-color: #f59e0b; }
+  .flow-box.red { border-color: #ef4444; }
+  .flow-box.purple { border-color: #a78bfa; }
+  .flow-box.blue { border-color: #3b82f6; }
+
+  /* ── Section Cards ── */
+  .card {
+    background: #111827; border: 1px solid #1f2937;
+    border-radius: 16px; padding: 28px; margin: 16px 0;
+  }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+
+  /* ── Indicator Cards ── */
+  .indicator {
+    background: linear-gradient(135deg, #0f1629, #151d35);
+    border: 1px solid #253050; border-radius: 12px;
+    padding: 20px; position: relative; overflow: hidden;
+  }
+  .indicator::before {
+    content: ''; position: absolute; top: 0; left: 0;
+    width: 4px; height: 100%; background: var(--accent, #3b82f6);
+  }
+  .indicator .name { font-weight: 700; font-size: 1.05em; color: #fff; margin-bottom: 4px; }
+  .indicator .type { font-size: 0.75em; color: var(--accent, #3b82f6); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .indicator .formula {
+    background: #0a0f1e; border: 1px solid #1a2545; border-radius: 8px;
+    padding: 10px 14px; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85em; color: #7dd3fc; margin: 8px 0; overflow-x: auto; white-space: pre-wrap;
+  }
+  .indicator .usage { font-size: 0.85em; color: #9ca3af; line-height: 1.5; }
+
+  /* ── Calculation Pipeline ── */
+  .pipeline { display: flex; flex-wrap: wrap; gap: 0; align-items: stretch; justify-content: center; margin: 20px 0; }
+  .pipe-step {
+    background: #131830; border: 1px solid #253050; border-radius: 12px;
+    padding: 16px 20px; min-width: 170px; max-width: 200px; text-align: center;
+    position: relative;
+  }
+  .pipe-step .step-num {
+    background: #7b2ff7; color: #fff; font-weight: 800; font-size: 0.75em;
+    width: 24px; height: 24px; border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center; margin-bottom: 8px;
+  }
+  .pipe-step .step-title { font-weight: 700; font-size: 0.9em; color: #fff; }
+  .pipe-step .step-detail { font-size: 0.78em; color: #9ca3af; margin-top: 6px; }
+  .pipe-arrow { display: flex; align-items: center; font-size: 1.5em; color: #374151; padding: 0 4px; }
+
+  /* ── Risk Table ── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th { background: #1a2240; color: #00d4ff; font-weight: 600; text-align: left; padding: 10px 14px; font-size: 0.85em; }
+  td { padding: 10px 14px; border-bottom: 1px solid #1a2240; font-size: 0.88em; }
+  tr:hover td { background: #131830; }
+
+  /* ── Score Breakdown ── */
+  .score-bar-wrap { margin: 6px 0; }
+  .score-label { display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 3px; }
+  .score-bar { background: #1a2240; border-radius: 6px; height: 10px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 6px; transition: width 0.5s; }
+
+  /* ── Greeks Visual ── */
+  .greeks-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 12px 0; }
+  .greek-card {
+    background: #0f1629; border: 1px solid #253050; border-radius: 10px;
+    padding: 14px; text-align: center;
+  }
+  .greek-card .symbol { font-size: 1.8em; font-weight: 800; margin-bottom: 4px; }
+  .greek-card .greek-name { font-size: 0.85em; font-weight: 600; color: #a78bfa; }
+  .greek-card .greek-desc { font-size: 0.75em; color: #6b7280; margin-top: 4px; }
+  .greek-card .greek-formula { font-family: monospace; font-size: 0.72em; color: #7dd3fc; margin-top: 6px; background: #0a0e1a; padding: 4px 8px; border-radius: 4px; }
+
+  /* ── Exit Logic Visual ── */
+  .exit-timeline { position: relative; padding-left: 30px; margin: 16px 0; }
+  .exit-timeline::before { content:''; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: #253050; }
+  .exit-item { position: relative; margin-bottom: 18px; padding-left: 20px; }
+  .exit-item::before {
+    content:''; position: absolute; left: -22px; top: 4px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--dot-color, #3b82f6); border: 2px solid #0a0e1a;
+  }
+  .exit-item .exit-title { font-weight: 700; font-size: 0.92em; color: #fff; }
+  .exit-item .exit-desc { font-size: 0.82em; color: #9ca3af; margin-top: 2px; }
+
+  /* ── WhatsApp Mock ── */
+  .wa-mock {
+    background: #0b141a; border-radius: 16px; max-width: 380px;
+    margin: 20px auto; padding: 16px; font-family: 'Segoe UI', sans-serif;
+    border: 1px solid #1a2e35;
+  }
+  .wa-header { background: #1f2c33; padding: 10px 14px; border-radius: 10px 10px 0 0; margin: -16px -16px 12px; font-weight: 600; color: #e9edef; font-size: 0.9em; }
+  .wa-msg {
+    background: #005c4b; border-radius: 8px; padding: 10px 12px;
+    margin: 6px 0; font-size: 0.82em; color: #e9edef;
+    max-width: 85%; line-height: 1.45; white-space: pre-line;
+  }
+  .wa-msg.incoming { background: #1f2c33; margin-left: auto; max-width: 60%; text-align: right; }
+  .wa-time { font-size: 0.65em; color: #8696a0; text-align: right; margin-top: 4px; }
+
+  @media (max-width: 768px) {
+    body { padding: 16px; }
+    .greeks-grid { grid-template-columns: repeat(2, 1fr); }
+    .card-grid { grid-template-columns: 1fr; }
+    .flow-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Nifty Options AI Agent</h1>
+<p class="subtitle">System Architecture, Indicators & Calculations</p>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>1. System Flow — End to End</h2>
+
+<div class="flow-container">
+  <div class="flow-box green">
+    <div class="icon">🔐</div>
+    <div class="title">Pre-Market Login</div>
+    <div class="desc">Kite Connect OAuth + TOTP auto-login</div>
+    <div class="time">9:00 AM IST</div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-box blue">
+    <div class="icon">📡</div>
+    <div class="title">WebSocket Connect</div>
+    <div class="desc">Subscribe NIFTY/BANKNIFTY spot + ATM options<br>KiteTicker MODE_FULL (OI, depth, IV)</div>
+    <div class="time">9:00 AM</div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-box purple">
+    <div class="icon">🔍</div>
+    <div class="title">Options Chain Scanner</div>
+    <div class="desc">Fetch chain → Filter ATM±10 strikes → Compute Greeks → Score setups</div>
+    <div class="time">Every 5 min, 9:20 AM – 3:15 PM</div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-row">
+    <div class="flow-box purple" style="min-width:180px;">
+      <div class="icon">🤖</div>
+      <div class="title">AI Analysis</div>
+      <div class="desc">Claude API evaluates<br>top 10 options</div>
+    </div>
+    <div style="color:#374151;font-size:1.2em;font-weight:700;">OR</div>
+    <div class="flow-box purple" style="min-width:180px;">
+      <div class="icon">📏</div>
+      <div class="title">Rule-Based</div>
+      <div class="desc">Momentum breakout<br>OI reversal strategy</div>
+    </div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-box orange">
+    <div class="icon">🛡️</div>
+    <div class="title">Risk Manager Gate</div>
+    <div class="desc">Daily loss ✓ Max positions ✓ Margin ✓ R:R ✓ Time ✓ Spread ✓</div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-box green">
+    <div class="icon">📲</div>
+    <div class="title">WhatsApp Alert</div>
+    <div class="desc">Send trade alert with entry, SL, target, reasoning</div>
+    <div class="time">5-min confirmation window</div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-row">
+    <div class="flow-box green" style="min-width:160px;">
+      <div class="icon">✅</div>
+      <div class="title">YES → Execute</div>
+      <div class="desc">Market order via Kite</div>
+    </div>
+    <div class="flow-box red" style="min-width:160px;">
+      <div class="icon">❌</div>
+      <div class="title">NO → Skip</div>
+      <div class="desc">Signal marked REJECTED</div>
+    </div>
+    <div class="flow-box orange" style="min-width:160px;">
+      <div class="icon">⏰</div>
+      <div class="title">Timeout → Expire</div>
+      <div class="desc">Auto-cancel after 5 min</div>
+    </div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-box blue">
+    <div class="icon">👁️</div>
+    <div class="title">Position Monitor</div>
+    <div class="desc">Real-time tick monitoring → Trailing SL → Auto-exit</div>
+    <div class="time">Continuous (every tick)</div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-box red">
+    <div class="icon">📊</div>
+    <div class="title">Exit & P&L</div>
+    <div class="desc">Execute exit → Calculate charges → WhatsApp P&L notification</div>
+  </div>
+  <div class="arrow-down">⬇</div>
+
+  <div class="flow-box" style="border-color:#6b7280;">
+    <div class="icon">📈</div>
+    <div class="title">Daily Summary</div>
+    <div class="desc">EOD squareoff → Win/loss stats → ROI → System offline</div>
+    <div class="time">3:15 PM (squareoff) → 3:35 PM (summary)</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>2. Indicators & Market Data Used</h2>
+
+<div class="card-grid">
+  <div class="indicator" style="--accent:#10b981;">
+    <div class="type">Volume Indicator</div>
+    <div class="name">Open Interest (OI)</div>
+    <div class="formula">OI = Total outstanding contracts (not yet settled)</div>
+    <div class="usage">
+      <strong>High Put OI at a strike</strong> → Acts as support (writers won't let it breach)<br>
+      <strong>High Call OI at a strike</strong> → Acts as resistance<br>
+      <strong>OI Buildup + Price rise</strong> → Long buildup (bullish)<br>
+      <strong>OI Buildup + Price fall</strong> → Short buildup (bearish)<br>
+      <strong>Scoring:</strong> OI > 1M → 25pts, > 500K → 20pts, > 100K → 15pts
+    </div>
+  </div>
+
+  <div class="indicator" style="--accent:#f59e0b;">
+    <div class="type">Volatility Indicator</div>
+    <div class="name">Implied Volatility (IV)</div>
+    <div class="formula">IV is extracted from market option prices via Black-Scholes model
+(Exchange provides IV in MODE_FULL ticks)</div>
+    <div class="usage">
+      <strong>High IV (>75th percentile)</strong> → Options are expensive → Good for selling<br>
+      <strong>Low IV (<25th percentile)</strong> → Options are cheap → Good for buying<br>
+      <strong>IV Crush</strong> → If IV drops >20% from entry → Consider exit<br>
+      <strong>Scoring:</strong> IV 15-35% → 15pts (sweet spot for buying)
+    </div>
+  </div>
+
+  <div class="indicator" style="--accent:#3b82f6;">
+    <div class="type">Liquidity Indicator</div>
+    <div class="name">Volume & Bid-Ask Spread</div>
+    <div class="formula">Spread % = ((Ask - Bid) / LTP) × 100
+Volume = Number of contracts traded today</div>
+    <div class="usage">
+      <strong>Volume > 100K</strong> → Highly liquid → 20pts<br>
+      <strong>Spread < 0.5%</strong> → Very tight → 15pts (low slippage)<br>
+      <strong>Spread > 2%</strong> → SKIP (too illiquid, entry/exit will be costly)<br>
+      <strong>Min premium:</strong> Skip options below ₹50 (wide spreads)
+    </div>
+  </div>
+
+  <div class="indicator" style="--accent:#ef4444;">
+    <div class="type">Price Indicator</div>
+    <div class="name">Last Traded Price (LTP) & Spot</div>
+    <div class="formula">ATM Strike = round(Spot / StrikeStep) × StrikeStep
+NIFTY StrikeStep = 50, BANKNIFTY StrikeStep = 100</div>
+    <div class="usage">
+      <strong>ATM ± 10 strikes</strong> scanned on each cycle<br>
+      <strong>Preferred premium range:</strong> ₹100-500 → 10pts<br>
+      <strong>Delta 0.3-0.5</strong> → Slightly OTM to ATM (best risk/reward)
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>3. Black-Scholes Greeks — Calculations</h2>
+
+<div class="card">
+  <div class="greeks-grid">
+    <div class="greek-card">
+      <div class="symbol" style="color:#10b981;">Δ</div>
+      <div class="greek-name">Delta</div>
+      <div class="greek-desc">Price sensitivity to ₹1 move in spot</div>
+      <div class="greek-formula">CE: N(d₁)  PE: N(d₁) - 1</div>
+    </div>
+    <div class="greek-card">
+      <div class="symbol" style="color:#f59e0b;">Γ</div>
+      <div class="greek-name">Gamma</div>
+      <div class="greek-desc">Rate of change of Delta</div>
+      <div class="greek-formula">N'(d₁) / (S·σ·√T)</div>
+    </div>
+    <div class="greek-card">
+      <div class="symbol" style="color:#ef4444;">Θ</div>
+      <div class="greek-name">Theta</div>
+      <div class="greek-desc">Daily time decay (₹/day)</div>
+      <div class="greek-formula">-(S·N'(d₁)·σ)/(2√T) ± rKe⁻ʳᵀN(±d₂) / 365</div>
+    </div>
+    <div class="greek-card">
+      <div class="symbol" style="color:#a78bfa;">ν</div>
+      <div class="greek-name">Vega</div>
+      <div class="greek-desc">Sensitivity to 1% IV change</div>
+      <div class="greek-formula">S · N'(d₁) · √T / 100</div>
+    </div>
+  </div>
+
+  <h3>Core Black-Scholes Formulas</h3>
+  <div class="indicator" style="--accent:#7b2ff7; margin-top:12px;">
+    <div class="formula">d₁ = [ln(S/K) + (r + σ²/2)·T] / (σ·√T)
+d₂ = d₁ - σ·√T
+
+Where:
+  S  = Spot price (e.g., NIFTY at 22,500)
+  K  = Strike price (e.g., 22,500)
+  T  = Time to expiry in years (e.g., 5 days = 5/365 = 0.0137)
+  r  = Risk-free rate (6.5% = 0.065)
+  σ  = Implied Volatility (decimal, e.g., 0.15 for 15%)
+  N()  = Cumulative normal distribution
+  N'() = Normal probability density function</div>
+  </div>
+
+  <h3>How Greeks Are Used in Scoring</h3>
+  <table>
+    <tr><th>Greek</th><th>Preferred Range (Buying)</th><th>Score</th><th>Why</th></tr>
+    <tr><td>|Delta|</td><td>0.30 – 0.50</td><td>+15 pts</td><td>Slightly OTM to ATM, best leverage with reasonable probability</td></tr>
+    <tr><td>|Delta|</td><td>0.20 – 0.60</td><td>+10 pts</td><td>Acceptable range, moderate risk</td></tr>
+    <tr><td>Gamma</td><td>High (near ATM)</td><td>Implicit</td><td>High gamma = delta changes fast = explosive moves possible</td></tr>
+    <tr><td>Theta</td><td>Low negative</td><td>Implicit</td><td>Lower decay = more time for trade to work</td></tr>
+    <tr><td>Vega</td><td>Moderate</td><td>Implicit</td><td>Higher vega = more impact from IV changes</td></tr>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>4. Scoring Engine — Setup Ranking (0-100)</h2>
+
+<div class="card">
+  <div class="score-bar-wrap">
+    <div class="score-label"><span>Open Interest (OI)</span><span style="color:#10b981;">25 pts max</span></div>
+    <div class="score-bar"><div class="score-fill" style="width:25%;background:linear-gradient(90deg,#10b981,#34d399);"></div></div>
+  </div>
+  <div class="score-bar-wrap">
+    <div class="score-label"><span>Volume</span><span style="color:#3b82f6;">20 pts max</span></div>
+    <div class="score-bar"><div class="score-fill" style="width:20%;background:linear-gradient(90deg,#3b82f6,#60a5fa);"></div></div>
+  </div>
+  <div class="score-bar-wrap">
+    <div class="score-label"><span>Bid-Ask Spread Tightness</span><span style="color:#8b5cf6;">15 pts max</span></div>
+    <div class="score-bar"><div class="score-fill" style="width:15%;background:linear-gradient(90deg,#8b5cf6,#a78bfa);"></div></div>
+  </div>
+  <div class="score-bar-wrap">
+    <div class="score-label"><span>IV Percentile (sweet spot)</span><span style="color:#f59e0b;">15 pts max</span></div>
+    <div class="score-bar"><div class="score-fill" style="width:15%;background:linear-gradient(90deg,#f59e0b,#fbbf24);"></div></div>
+  </div>
+  <div class="score-bar-wrap">
+    <div class="score-label"><span>Delta Alignment</span><span style="color:#ec4899;">15 pts max</span></div>
+    <div class="score-bar"><div class="score-fill" style="width:15%;background:linear-gradient(90deg,#ec4899,#f472b6);"></div></div>
+  </div>
+  <div class="score-bar-wrap">
+    <div class="score-label"><span>Premium Level (₹100-500)</span><span style="color:#06b6d4;">10 pts max</span></div>
+    <div class="score-bar"><div class="score-fill" style="width:10%;background:linear-gradient(90deg,#06b6d4,#22d3ee);"></div></div>
+  </div>
+
+  <p style="margin-top:16px;font-size:0.88em;color:#9ca3af;">
+    <strong>Threshold:</strong> Only setups scoring ≥50 are considered for signals. Top 5 setups are passed to AI or rule engine.
+  </p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>5. Signal Generation Strategies</h2>
+
+<div class="card-grid">
+  <div class="card">
+    <h3 style="margin-top:0;">Strategy 1: Momentum Breakout</h3>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="step-num">1</div>
+        <div class="step-title">Score ≥ 50</div>
+        <div class="step-detail">High-scoring setup from scanner</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">2</div>
+        <div class="step-title">Volume > 10K</div>
+        <div class="step-detail">Confirm momentum with volume</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">3</div>
+        <div class="step-title">Set SL/TGT</div>
+        <div class="step-detail">SL = -30% of premium<br>Target = 1:2 R:R</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">4</div>
+        <div class="step-title">BUY Signal</div>
+        <div class="step-detail">If R:R ≥ 1.5</div>
+      </div>
+    </div>
+    <div class="indicator" style="--accent:#10b981;">
+      <div class="formula">Stop Loss = Entry × 0.70  (30% of premium)
+Target = Entry + (Entry - SL) × 2.0  (1:2 risk-reward)
+Confidence = min(Score / 100, 0.9)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Strategy 2: OI Reversal</h3>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="step-num">1</div>
+        <div class="step-title">Find High PE OI</div>
+        <div class="step-detail">PUT OI > 200K at a strike = support</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">2</div>
+        <div class="step-title">Find CE Near</div>
+        <div class="step-detail">CE within ±200 of support strike</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">3</div>
+        <div class="step-title">Score ≥ 40</div>
+        <div class="step-detail">CE must be liquid</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">4</div>
+        <div class="step-title">BUY CE</div>
+        <div class="step-detail">Bullish bias from put support</div>
+      </div>
+    </div>
+    <div class="indicator" style="--accent:#f59e0b;">
+      <div class="formula">Logic: High Put OI = Writers sold PUTs = They'll defend that level
+→ Spot unlikely to fall below → Bullish → Buy CE near that strike
+
+Example: 22400PE has 1.5M OI → Buy 22500CE</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>6. Risk Management — All Checks</h2>
+
+<div class="card">
+  <table>
+    <tr><th>#</th><th>Check</th><th>Limit</th><th>Action if Failed</th></tr>
+    <tr><td>1</td><td>Daily P&L</td><td>≤ -₹5,000</td><td>Stop all trading for the day</td></tr>
+    <tr><td>2</td><td>Open Positions</td><td>Max 2</td><td>Reject new signals</td></tr>
+    <tr><td>3</td><td>Margin Available</td><td>5% of capital per trade</td><td>Reject if insufficient</td></tr>
+    <tr><td>4</td><td>Risk:Reward</td><td>≥ 1:1.5</td><td>Reject low R:R setups</td></tr>
+    <tr><td>5</td><td>Market Close Proximity</td><td>Not after 3:15 PM</td><td>No new trades</td></tr>
+    <tr><td>6</td><td>Per-Trade Max Loss</td><td>₹2,000</td><td>Reduce lot size or reject</td></tr>
+  </table>
+
+  <h3>Position Sizing Formula</h3>
+  <div class="indicator" style="--accent:#ef4444;">
+    <div class="formula">risk_per_unit = |Entry - Stop Loss|
+
+max_units = MAX_LOSS_PER_TRADE / risk_per_unit
+         = ₹2,000 / risk_per_unit
+
+lots = floor(max_units / lot_size)
+lots = max(lots, 1)   ← At least 1 lot
+
+quantity = lots × lot_size
+
+Example:
+  Entry = ₹185, SL = ₹150, Lot = 75
+  Risk/unit = ₹35
+  Max units = 2000/35 = 57.1
+  Lots = floor(57.1/75) = 0 → 1 (minimum)
+  Quantity = 75</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>7. Exit Logic — Trailing SL & Auto-Exit</h2>
+
+<div class="card">
+  <div class="exit-timeline">
+    <div class="exit-item" style="--dot-color:#ef4444;">
+      <div class="exit-title">1. Stop Loss Hit</div>
+      <div class="exit-desc">Price ≤ SL → Immediate MARKET exit. No delay, no second-guessing.</div>
+    </div>
+    <div class="exit-item" style="--dot-color:#10b981;">
+      <div class="exit-title">2. Target Hit</div>
+      <div class="exit-desc">Price ≥ Target → Immediate MARKET exit. Book full profit.</div>
+    </div>
+    <div class="exit-item" style="--dot-color:#f59e0b;">
+      <div class="exit-title">3. Trailing SL — Breakeven</div>
+      <div class="exit-desc">When price reaches 50% of target move → Trail SL to entry (breakeven). Risk-free trade.</div>
+    </div>
+    <div class="exit-item" style="--dot-color:#8b5cf6;">
+      <div class="exit-title">4. Trailing SL — Profit Lock</div>
+      <div class="exit-desc">When price reaches 75% of target move → Trail SL to lock 50% of unrealized profit.</div>
+    </div>
+    <div class="exit-item" style="--dot-color:#3b82f6;">
+      <div class="exit-title">5. Time-Based Exit</div>
+      <div class="exit-desc">3:15 PM for regular days, 3:20 PM on expiry days. Auto square-off all MIS.</div>
+    </div>
+    <div class="exit-item" style="--dot-color:#06b6d4;">
+      <div class="exit-title">6. Max Holding Time</div>
+      <div class="exit-desc">If held > 2 hours with < 10% profit → Exit. Don't let theta eat your premium.</div>
+    </div>
+  </div>
+
+  <h3>Trailing SL Calculation</h3>
+  <div class="indicator" style="--accent:#f59e0b;">
+    <div class="formula">total_move = Target - Entry
+current_move = Current Price - Entry
+move_percent = (current_move / total_move) × 100
+
+IF move_percent ≥ 50%:
+    new_SL = Entry (breakeven)
+
+IF move_percent ≥ 75%:
+    new_SL = Entry + current_move × 0.50 (lock half the profit)
+
+Example:
+  Entry=₹185, Target=₹250, SL=₹150
+  total_move = ₹65
+
+  Price hits ₹217.50 (50% of ₹65 = ₹32.50):
+    → SL trails from ₹150 to ₹185 (breakeven)
+
+  Price hits ₹233.75 (75% of ₹65 = ₹48.75):
+    → SL trails to ₹185 + ₹48.75×0.5 = ₹209.38 (locked ₹24.38 profit)</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>8. Charges Calculation</h2>
+
+<div class="card">
+  <div class="indicator" style="--accent:#ef4444;">
+    <div class="formula">Brokerage     = ₹20 flat per executed order (buy + sell = ₹40)
+STT           = 0.0625% on sell-side turnover (options)
+GST           = 18% on brokerage
+Stamp Duty    = 0.003% on buy-side turnover
+SEBI Charges  = 0.0001% on total turnover
+Exchange Txn  = 0.00053% on total turnover (NSE)
+
+Total Turnover = (Entry + Exit) × Quantity
+
+Example (NIFTY CE, 1 lot = 75 units):
+  Buy  ₹185 × 75 = ₹13,875
+  Sell ₹238 × 75 = ₹17,850
+  Turnover = ₹31,725
+
+  Brokerage  = ₹40.00
+  STT        = ₹17,850 × 0.000625 = ₹11.16
+  GST        = ₹40 × 0.18 = ₹7.20
+  Stamp      = ₹13,875 × 0.00003 = ₹0.42
+  SEBI       = ₹31,725 × 0.000001 = ₹0.03
+  Exchange   = ₹31,725 × 0.0000053 = ₹0.17
+  ─────────────────────────────────
+  Total Charges ≈ ₹58.98
+  Gross P&L = (238-185) × 75 = ₹3,975
+  Net P&L   = ₹3,975 - ₹58.98 = ₹3,916.02</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>9. WhatsApp Communication Flow</h2>
+
+<div class="card" style="display:flex;justify-content:center;gap:30px;flex-wrap:wrap;">
+  <div class="wa-mock">
+    <div class="wa-header">📱 Trading Agent</div>
+    <div class="wa-msg">🔔 <b>TRADE ALERT</b>
+====================
+📊 NIFTY 22500 CE
+📅 Expiry: 2025-03-06
+
+▶️ Action: BUY
+💰 Entry: ₹185.50
+🛑 Stop Loss: ₹150.00 (-19.1%)
+🎯 Target: ₹250.00 (+34.8%)
+📐 Risk:Reward: 1:1.82
+📦 Qty: 75 (1 lot)
+💵 Capital Required: ~₹13,912
+
+📝 Reason: Strong OI buildup at 22400PE suggesting support. Momentum bullish.
+
+✅ Reply YES to execute
+❌ Reply NO to skip
+⏰ Alert expires in 5 minutes</div>
+    <div class="wa-time">9:25 AM</div>
+
+    <div class="wa-msg incoming">YES</div>
+    <div class="wa-time">9:26 AM</div>
+
+    <div class="wa-msg">✅ <b>ORDER EXECUTED</b>
+Order ID: 240306000123
+NIFTY 22500 CE BUY @ ₹186.00
+Qty: 75 | Product: MIS
+SL order placed at ₹150.00</div>
+    <div class="wa-time">9:26 AM</div>
+
+    <div class="wa-msg">📈 <b>POSITION CLOSED</b>
+====================
+NIFTY 22500 CE
+Entry: ₹186.00 → Exit: ₹238.00
+P&L: +₹3,900.00 (+27.9%)
+Exit Reason: Target hit
+Duration: 47 minutes</div>
+    <div class="wa-time">10:13 AM</div>
+  </div>
+
+  <div class="wa-mock">
+    <div class="wa-header">📱 Commands</div>
+    <div class="wa-msg incoming">STATUS</div>
+    <div class="wa-time">11:00 AM</div>
+    <div class="wa-msg">Status: ACTIVE
+Open positions: 1
+Today's trades: 3
+Daily P&L: ₹4,200</div>
+    <div class="wa-time">11:00 AM</div>
+
+    <div class="wa-msg incoming">POSITIONS</div>
+    <div class="wa-time">11:30 AM</div>
+    <div class="wa-msg">📋 OPEN POSITIONS
+- BANKNIFTY 48000 CE: BUY @ ₹320.00 | P&L: +₹1,200</div>
+    <div class="wa-time">11:30 AM</div>
+
+    <div class="wa-msg incoming">EXIT ALL</div>
+    <div class="wa-time">2:00 PM</div>
+    <div class="wa-msg">Exiting all positions...</div>
+
+    <div class="wa-msg">📊 <b>DAILY SUMMARY</b>
+====================
+Total Trades: 3
+Winners: 2 | Losers: 1
+Gross P&L: +₹5,200
+Net P&L: +₹4,850
+Capital Used: ₹42,000
+ROI: 11.5%</div>
+    <div class="wa-time">3:35 PM</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>10. Data Pipeline — Calculation Flow</h2>
+
+<div class="card">
+  <div class="pipeline" style="flex-wrap:wrap;">
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">1</div>
+      <div class="step-title">Kite Instruments</div>
+      <div class="step-detail">Fetch all NFO instruments once/day. Cache tokens, lot sizes, expiries.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">2</div>
+      <div class="step-title">Spot Price</div>
+      <div class="step-detail">Get NIFTY/BANKNIFTY LTP. Calculate ATM strike.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">3</div>
+      <div class="step-title">Option Chain</div>
+      <div class="step-detail">Filter ATM±10 strikes for nearest expiry. ~40 options.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">4</div>
+      <div class="step-title">Quotes</div>
+      <div class="step-detail">Batch fetch LTP, OI, volume, depth, IV for all.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">5</div>
+      <div class="step-title">Greeks</div>
+      <div class="step-detail">Black-Scholes: Δ, Γ, Θ, ν for each option.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">6</div>
+      <div class="step-title">Score</div>
+      <div class="step-detail">Rank 0-100 by OI, volume, spread, IV, delta, premium.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">7</div>
+      <div class="step-title">Signal</div>
+      <div class="step-detail">AI or rule-based strategy picks best trade.</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step" style="max-width:160px;">
+      <div class="step-num">8</div>
+      <div class="step-title">Risk Gate</div>
+      <div class="step-detail">6-point checklist. Size position. Approve/reject.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2>11. Architecture Diagram</h2>
+
+<div class="card" style="text-align:center;">
+  <pre style="font-family:'JetBrains Mono',monospace;font-size:0.78em;color:#9ca3af;line-height:1.6;text-align:left;display:inline-block;">
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              MAIN.PY (Orchestrator)                         │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐  ┌─────────────────┐   │
+│  │  APScheduler │  │  Signal Lock │  │ Pending    │  │ Trading Stopped │   │
+│  │  (cron jobs) │  │  (threading) │  │ Signal Q   │  │ Flag            │   │
+│  └──────┬──────┘  └──────────────┘  └────────────┘  └─────────────────┘   │
+│         │                                                                    │
+├─────────┼────────────────────────────────────────────────────────────────────┤
+│         ▼                                                                    │
+│  ┌─────────────────────┐     ┌─────────────────────┐                        │
+│  │    BROKER LAYER      │     │   STRATEGY LAYER     │                       │
+│  │  ┌───────────────┐  │     │  ┌────────────────┐  │                       │
+│  │  │  kite_auth.py  │  │     │  │ options_scanner │  │                       │
+│  │  │  TOTP + OAuth  │  │◄───►│  │ Black-Scholes  │  │                       │
+│  │  └───────────────┘  │     │  │ Scoring Engine │  │                       │
+│  │  ┌───────────────┐  │     │  └────────────────┘  │                       │
+│  │  │ kite_client.py │  │     │  ┌────────────────┐  │                       │
+│  │  │ Orders/Quotes  │  │◄───►│  │signal_generator│  │                       │
+│  │  │ Positions      │  │     │  │ Momentum + OI  │  │                       │
+│  │  └───────────────┘  │     │  └────────────────┘  │                       │
+│  │  ┌───────────────┐  │     │  ┌────────────────┐  │                       │
+│  │  │kite_websocket │  │     │  │  risk_manager   │  │                       │
+│  │  │ Live Ticks    │──│─────│─►│ 6-Point Gate   │  │                       │
+│  │  │ MODE_FULL     │  │     │  └────────────────┘  │                       │
+│  │  └───────────────┘  │     │  ┌────────────────┐  │                       │
+│  └─────────────────────┘     │  │  exit_manager   │  │                       │
+│                               │  │ Trailing SL    │  │                       │
+│                               │  │ Time/IV Exit   │  │                       │
+│                               │  └────────────────┘  │                       │
+│                               └─────────────────────┘                        │
+│                                                                              │
+│  ┌─────────────────────┐     ┌─────────────────────┐                        │
+│  │   WHATSAPP LAYER     │     │     AI LAYER         │                       │
+│  │  ┌───────────────┐  │     │  ┌────────────────┐  │                       │
+│  │  │ twilio_client  │  │     │  │trade_analyzer  │  │                       │
+│  │  │ Send alerts   │  │     │  │ Claude Sonnet  │  │                       │
+│  │  └───────────────┘  │     │  │ JSON responses │  │                       │
+│  │  ┌───────────────┐  │     │  └────────────────┘  │                       │
+│  │  │webhook_server │  │     │  ┌────────────────┐  │                       │
+│  │  │ Flask /webhook│  │     │  │   prompts.py   │  │                       │
+│  │  │ YES/NO/STATUS │  │     │  │ System + User  │  │                       │
+│  │  └───────────────┘  │     │  └────────────────┘  │                       │
+│  │  ┌───────────────┐  │     └─────────────────────┘                        │
+│  │  │msg_templates  │  │                                                     │
+│  │  │ Format alerts │  │     ┌─────────────────────┐                        │
+│  │  └───────────────┘  │     │   DATABASE LAYER     │                       │
+│  └─────────────────────┘     │  SQLite: signals,    │                       │
+│                               │  trades, sessions,   │                       │
+│                               │  daily_summary       │                       │
+│                               └─────────────────────┘                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  EXTERNAL SERVICES:
+  ┌────────────┐   ┌────────────┐   ┌────────────┐
+  │  Zerodha   │   │   Twilio   │   │  Anthropic │
+  │  Kite API  │   │  WhatsApp  │   │ Claude API │
+  │  + WSS     │   │  Business  │   │  Sonnet    │
+  └────────────┘   └────────────┘   └────────────┘
+  </pre>
+</div>
+
+<p style="text-align:center;color:#4b5563;margin-top:40px;font-size:0.85em;">
+  Generated for Nifty Options AI Agent &middot; Built with Python 3.11+ &middot; Kite Connect + Twilio + Claude API
+</p>
+
+</body>
+</html>

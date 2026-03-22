@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIFTY Options AI Agent — Complete Trading System Documentation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0e1a;color:#d1d5db;line-height:1.7;max-width:1150px;margin:0 auto;padding:30px 40px 80px;}
+@media(max-width:800px){body{padding:16px;}}
+h1{font-size:2.5em;text-align:center;margin-bottom:6px;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.2;}
+.sub{text-align:center;color:#6b7280;font-size:1em;margin-bottom:50px;}
+h2{color:#00d4ff;font-size:1.55em;margin:55px 0 18px;padding-bottom:10px;border-bottom:2px solid #1a2040;}
+h3{color:#a78bfa;font-size:1.15em;margin:30px 0 12px;}
+h4{color:#f59e0b;font-size:1em;margin:22px 0 8px;}
+p{margin:8px 0;font-size:0.92em;}
+ul,ol{margin:10px 0 10px 24px;} li{margin:5px 0;font-size:0.92em;}
+strong{color:#e0e0e0;}
+.card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:24px;margin:16px 0;}
+.card.a{border-left:4px solid var(--c,#3b82f6);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+.code{background:#0a0f1e;border:1px solid #1a2545;border-radius:10px;padding:16px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:0.82em;color:#7dd3fc;margin:12px 0;overflow-x:auto;white-space:pre-wrap;line-height:1.55;}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.88em;}
+th{background:#1a2240;color:#00d4ff;padding:10px 14px;text-align:left;}
+td{padding:10px 14px;border-bottom:1px solid #1a2040;}
+tr:hover td{background:#0f1629;}
+.tag{display:inline-block;padding:3px 10px;border-radius:14px;font-size:0.72em;font-weight:700;}
+.tg{background:#064e3b;color:#10b981;} .tr{background:#450a0a;color:#ef4444;}
+.tb{background:#172554;color:#3b82f6;} .to{background:#451a03;color:#f59e0b;}
+.tp{background:#2e1065;color:#a78bfa;} .tn{background:#1c1917;color:#a3a3a3;}
+.flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:20px 0;}
+.flow-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;margin:6px 0;}
+.fb{background:linear-gradient(135deg,#131830,#1a2240);border:1px solid #2a3460;border-radius:12px;padding:14px 22px;min-width:160px;text-align:center;transition:0.2s;}
+.fb:hover{border-color:#00d4ff;transform:scale(1.02);}
+.fb .title{font-weight:700;font-size:0.9em;color:#fff;} .fb .desc{font-size:0.76em;color:#9ca3af;margin-top:4px;line-height:1.4;}
+.fb.green{border-color:#10b981;} .fb.red{border-color:#ef4444;} .fb.blue{border-color:#3b82f6;}
+.fb.purple{border-color:#a78bfa;} .fb.orange{border-color:#f59e0b;} .fb.cyan{border-color:#06b6d4;}
+.arrow{color:#2a3460;font-size:1.6em;line-height:1;}
+.callout{border-radius:10px;padding:14px 18px;margin:14px 0;font-size:0.88em;}
+.callout.info{background:#172554;border:1px solid #3b82f6;} .callout.warn{background:#451a03;border:1px solid #f59e0b;}
+.callout.ok{background:#041f17;border:1px solid #10b981;} .callout.danger{background:#450a0a;border:1px solid #ef4444;}
+.metric{display:inline-block;background:#111827;border:1px solid #253050;border-radius:8px;padding:4px 12px;font-weight:700;margin:2px;}
+.metric.g{color:#10b981;border-color:#10b981;} .metric.r{color:#ef4444;border-color:#ef4444;}
+.metric.b{color:#3b82f6;border-color:#3b82f6;}
+pre.arch{font-family:'JetBrains Mono',monospace;font-size:0.72em;color:#6b7280;line-height:1.6;background:#0a0f1e;padding:20px;border-radius:12px;border:1px solid #1a2545;overflow-x:auto;}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start;}
+.vs-mid{text-align:center;color:#374151;font-size:1.8em;font-weight:800;padding-top:40px;}
+.ind-box{background:linear-gradient(135deg,#0f1629,#151d35);border:1px solid #253050;border-radius:12px;padding:18px;position:relative;overflow:hidden;}
+.ind-box::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--c,#3b82f6);}
+.ind-box .name{font-weight:700;font-size:1.05em;color:#fff;margin-bottom:2px;}
+.ind-box .type{font-size:0.7em;color:var(--c);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.chart-mock{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:16px;margin:10px 0;position:relative;height:160px;overflow:hidden;}
+.chart-mock .title{font-size:0.8em;color:#00d4ff;font-weight:600;margin-bottom:6px;}
+.chart-mock .line{position:absolute;height:2px;border-radius:1px;}
+.chart-mock .dot{position:absolute;width:8px;height:8px;border-radius:50%;}
+.chart-mock .label{position:absolute;font-size:0.65em;font-weight:600;}
+.chart-mock .zone{position:absolute;opacity:0.08;border-radius:4px;}
+.gate{display:flex;gap:0;margin:12px 0;overflow-x:auto;}
+.gate-item{flex:1;background:#0f1629;border:1px solid #253050;padding:10px 8px;text-align:center;min-width:90px;}
+.gate-item:first-child{border-radius:10px 0 0 10px;} .gate-item:last-child{border-radius:0 10px 10px 0;}
+.gate-item .gn{font-size:0.65em;color:#00d4ff;font-weight:700;} .gate-item .gv{font-size:0.78em;font-weight:600;color:#fff;margin:3px 0;}
+.gate-item .gd{font-size:0.62em;color:#6b7280;} .gate-item.pass{border-color:#10b981;background:#041f17;}
+.toc{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:24px 30px;margin:30px 0;}
+.toc h3{margin-top:0;color:#00d4ff;} .toc ol{margin:10px 0 0 20px;} .toc li{margin:4px 0;}
+.toc a{color:#a78bfa;text-decoration:none;font-size:0.9em;} .toc a:hover{color:#00d4ff;text-decoration:underline;}
+</style>
+</head>
+<body>
+
+<h1>NIFTY Options AI Agent</h1>
+<p class="sub">Complete Trading System Documentation — V1 & V3 Setups, Indicators, Gates, Backtesting Results & Deployment</p>
+
+<!-- ═══ TOC ═══ -->
+<div class="toc">
+<h3>Table of Contents</h3>
+<ol>
+<li><a href="#s1">System Overview & Flow</a></li>
+<li><a href="#s2">Architecture & Tech Stack</a></li>
+<li><a href="#s3">The Two Strategy Versions: V1 & V3</a></li>
+<li><a href="#s4">V1 Indicators — Detailed</a></li>
+<li><a href="#s5">V3 Indicators — Detailed</a></li>
+<li><a href="#s6">Shared Indicators (Both Versions)</a></li>
+<li><a href="#s7">The 8-Gate Filter System</a></li>
+<li><a href="#s8">Trading Strategies: Momentum & OI Reversal</a></li>
+<li><a href="#s9">Risk Management & Position Sizing</a></li>
+<li><a href="#s10">Exit Logic & Trailing Stop Loss</a></li>
+<li><a href="#s11">Backtesting Results (Real Data, Jan-Mar 2026)</a></li>
+<li><a href="#s12">Paper Trading Setup</a></li>
+<li><a href="#s13">Deployment & Operations</a></li>
+</ol>
+</div>
+
+<!-- ═══ 1. SYSTEM OVERVIEW ═══ -->
+<h2 id="s1">1. System Overview & Flow</h2>
+
+<div class="card">
+<p>The system scans NIFTY 50 options every 2 minutes during market hours, uses 6 technical indicators to detect trend direction, passes signals through 8 quality gates, and executes trades with automated stop-loss management. Two strategy versions (V1 and V3) run simultaneously for comparison.</p>
+
+<div class="flow">
+  <div class="fb cyan"><div class="title">Market Data</div><div class="desc">Dhan API / Yahoo Finance<br>Spot price every 2 min</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="fb purple"><div class="title">6 Indicators Vote</div><div class="desc">Each says BULL / BEAR / NEUTRAL<br>V1 and V3 use different indicators</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="fb orange"><div class="title">8 Gates Filter</div><div class="desc">Trend &rarr; Exhaustion &rarr; RSI &rarr; Dead Zone<br>&rarr; Daily Bias &rarr; Price Action &rarr; Limits &rarr; Risk</div></div>
+  <div class="arrow">&darr;</div>
+  <div class="flow-h">
+    <div class="fb blue"><div class="title">OI Reversal</div><div class="desc">High OI confirms<br>support/resistance</div></div>
+    <div style="color:#374151;font-weight:800;">OR</div>
+    <div class="fb blue"><div class="title">Momentum</div><div class="desc">High score + volume<br>confirms trend</div></div>
+  </div>
+  <div class="arrow">&darr;</div>
+  <div class="fb green"><div class="title">Trade Executed</div><div class="desc">Entry + ATR-based SL + Target<br>4-stage trailing stop loss</div></div>
+</div>
+</div>
+
+<!-- ═══ 2. ARCHITECTURE ═══ -->
+<h2 id="s2">2. Architecture & Tech Stack</h2>
+
+<div class="code">nifty-options-agent/
+&boxvr;&boxh; config/           Settings, instrument mappings
+&boxvr;&boxh; broker/           Kite Connect auth, orders, WebSocket
+&boxvr;&boxh; strategy/
+&boxv;   &boxvr;&boxh; indicators.py     All 10+ indicators (EMA, RSI, MACD, Supertrend,
+&boxv;   &boxv;                       ADX, Stochastic, LinReg, Awesome Osc, ATR, etc.)
+&boxv;   &boxvr;&boxh; options_scanner.py  Option chain scanning + Black-Scholes Greeks
+&boxv;   &boxvr;&boxh; signal_generator.py Momentum + OI Reversal strategies
+&boxv;   &boxvr;&boxh; risk_manager.py     Position sizing, daily limits, R:R check
+&boxv;   &boxur;&boxh; exit_manager.py     4-stage trailing SL, partial profits, EOD exit
+&boxvr;&boxh; whatsapp/         Twilio WhatsApp alerts + webhook
+&boxvr;&boxh; ai/               Claude API trade analysis (optional)
+&boxvr;&boxh; backtest/         Engine, analyzer (30+ metrics), dashboard
+&boxvr;&boxh; paper_trading/
+&boxv;   &boxvr;&boxh; versions.py       V1 & V3 indicator configurations
+&boxv;   &boxvr;&boxh; dhan_broker.py    Dhan API integration (real data)
+&boxv;   &boxvr;&boxh; dhan_paper.py     Live paper trading runner
+&boxv;   &boxur;&boxh; trader.py         Yahoo Finance paper trader
+&boxvr;&boxh; main.py           Live trading orchestrator
+&boxur;&boxh; scheduler.py      APScheduler for market hours</div>
+
+<table>
+<tr><th>Component</th><th>Technology</th><th>Purpose</th></tr>
+<tr><td>Language</td><td>Python 3.9+</td><td>All business logic</td></tr>
+<tr><td>Live Broker</td><td>Zerodha Kite Connect</td><td>Production orders + WebSocket</td></tr>
+<tr><td>Paper Broker</td><td>DhanHQ API</td><td>Real data + virtual orders</td></tr>
+<tr><td>Free Data</td><td>Yahoo Finance (yfinance)</td><td>Backtesting + fallback</td></tr>
+<tr><td>Alerts</td><td>Twilio WhatsApp</td><td>Trade alerts + confirmation</td></tr>
+<tr><td>AI</td><td>Claude API (Anthropic)</td><td>Trade reasoning (optional)</td></tr>
+<tr><td>Dashboard</td><td>Chart.js</td><td>Interactive HTML reports</td></tr>
+</table>
+
+<!-- ═══ 3. V1 vs V3 ═══ -->
+<h2 id="s3">3. The Two Strategy Versions: V1 & V3</h2>
+
+<div class="vs">
+<div class="card" style="border-color:#3b82f6;">
+<h3 style="color:#3b82f6;margin-top:0;">V1: Supertrend + RSI</h3>
+<p style="font-size:0.85em;color:#9ca3af;">The original, battle-tested version. Highest P&L in paper trading.</p>
+<table>
+<tr><th>Slot</th><th>Indicator</th><th>Score</th></tr>
+<tr><td>1</td><td>EMA 5/13 Crossover</td><td>86.3</td></tr>
+<tr><td>2</td><td>Price vs EMA 20</td><td>81.6</td></tr>
+<tr><td>3</td><td><strong>RSI (14)</strong></td><td>74.8</td></tr>
+<tr><td>4</td><td>MACD (12/26/9)</td><td>80.7</td></tr>
+<tr><td>5</td><td><strong>Supertrend (7, 2.5)</strong></td><td>79.8</td></tr>
+<tr><td>6</td><td>Price Action (3-bar)</td><td>61.7</td></tr>
+</table>
+<div class="callout info" style="margin-top:12px;">
+<b>Why V1 works:</b> Supertrend's permanent BULL bias aligns with NIFTY's upward drift. RSI's NEUTRAL vote (0.5) makes it easier to reach the 60% threshold, letting more marginal-but-profitable CE trades through.
+</div>
+<h4>Paper Trading Result (Jan-Mar 2026)</h4>
+<div style="font-size:1.4em;font-weight:800;color:#10b981;">+78.0% ROI</div>
+<div style="font-size:0.85em;color:#9ca3af;">Rs.50,000 &rarr; Rs.88,996 | 69 trades | 33% WR</div>
+</div>
+
+<div class="vs-mid">vs</div>
+
+<div class="card" style="border-color:#10b981;">
+<h3 style="color:#10b981;margin-top:0;">V3: LinReg + Awesome Osc</h3>
+<p style="font-size:0.85em;color:#9ca3af;">Higher-scoring indicators. Best risk-adjusted returns.</p>
+<table>
+<tr><th>Slot</th><th>Indicator</th><th>Score</th></tr>
+<tr><td>1</td><td>EMA 5/13 Crossover</td><td>86.3</td></tr>
+<tr><td>2</td><td>Price vs EMA 20</td><td>81.6</td></tr>
+<tr><td>3</td><td><strong>LinReg Slope (20)</strong></td><td><strong>88.5</strong></td></tr>
+<tr><td>4</td><td>MACD (12/26/9)</td><td>80.7</td></tr>
+<tr><td>5</td><td><strong>Awesome Oscillator</strong></td><td><strong>87.5</strong></td></tr>
+<tr><td>6</td><td>Price Action (3-bar)</td><td>61.7</td></tr>
+</table>
+<div class="callout ok" style="margin-top:12px;">
+<b>Why V3 exists:</b> LinReg and Awesome Osc scored highest in our 17-indicator evaluation. They never get stuck (unlike Supertrend) and always give direction (unlike RSI's 28% NEUTRAL). Better on paper, being validated live.
+</div>
+<h4>Paper Trading Result (Jan-Mar 2026)</h4>
+<div style="font-size:1.4em;font-weight:800;color:#10b981;">+27.8% ROI</div>
+<div style="font-size:0.85em;color:#9ca3af;">Rs.50,000 &rarr; Rs.63,897 | 68 trades | 24% WR</div>
+</div>
+</div>
+
+<div class="callout warn">
+<b>Why run both?</b> V1 has higher total P&L but lower win rate (33%). V3 has higher-scored indicators but hasn't proven itself yet in varied conditions. Running both with Rs.50K each lets us validate which is better in live conditions before committing full capital.
+</div>
+
+<!-- ═══ 4. V1 INDICATORS ═══ -->
+<h2 id="s4">4. V1 Indicators — Detailed</h2>
+
+<p>V1 uses 6 indicators. Four are shared with V3 (covered in Section 6). Two are unique to V1:</p>
+
+<!-- RSI -->
+<div class="card a" style="--c:#a78bfa;">
+<h3 style="margin-top:0;">V1-Unique: RSI (14-period) — Relative Strength Index</h3>
+<div class="grid-2">
+<div>
+<h4>What It Measures</h4>
+<p>Speed and magnitude of recent price changes on a 0-100 scale. Tells you if buyers or sellers are in control.</p>
+
+<div class="code">Step 1: gain = max(price_change, 0)
+        loss = abs(min(price_change, 0))
+
+Step 2: avg_gain = EMA(gains, 14)
+        avg_loss = EMA(losses, 14)
+
+Step 3: RS = avg_gain / avg_loss
+
+Step 4: RSI = 100 - (100 / (1 + RS))
+
+Vote:
+  RSI > 55 &rarr; BULL  (+1 vote)
+  RSI < 45 &rarr; BEAR  (+0 votes)
+  RSI 45-55 &rarr; NEUTRAL (+0.5 votes)</div>
+
+<h4>Three Uses in the System</h4>
+<table>
+<tr><td><span class="tag tp">Voter</span></td><td>Contributes to trend direction (V1 only)</td></tr>
+<tr><td><span class="tag to">Gate 2</span></td><td>Block CE when RSI > 75 (overbought)</td></tr>
+<tr><td><span class="tag tr">Gate 2b</span></td><td>Block all when RSI 48-57 (dead zone)</td></tr>
+</table>
+</div>
+<div>
+<div class="chart-mock">
+<div class="title">RSI (14) with Zones</div>
+<div class="zone" style="left:0;right:0;top:0;height:25%;background:#ef4444;"></div>
+<div class="zone" style="left:0;right:0;bottom:0;height:25%;background:#10b981;"></div>
+<div class="zone" style="left:0;right:0;top:35%;height:30%;background:#f59e0b;"></div>
+<div class="line" style="left:5%;right:5%;top:25%;background:#ef4444;height:1px;"></div>
+<div class="line" style="left:5%;right:5%;top:75%;background:#10b981;height:1px;"></div>
+<div class="label" style="right:8%;top:8%;color:#ef4444;font-size:0.8em;">OVERBOUGHT > 75<br>Block CE entry</div>
+<div class="label" style="right:8%;top:38%;color:#f59e0b;font-size:0.8em;">DEAD ZONE 48-57<br>Block all entries</div>
+<div class="label" style="right:8%;bottom:8%;color:#10b981;font-size:0.8em;">OVERSOLD < 20<br>Block PE entry</div>
+</div>
+<div class="callout warn">
+<b>Real data finding:</b> RSI was NEUTRAL 28% of the time. This 0.5 vote padding actually helps V1 — it makes the 60% bull threshold easier to reach, letting profitable CE trades through.
+</div>
+</div>
+</div>
+</div>
+
+<!-- Supertrend -->
+<div class="card a" style="--c:#ef4444;">
+<h3 style="margin-top:0;">V1-Unique: Supertrend (7, 2.5)</h3>
+<div class="grid-2">
+<div>
+<h4>What It Measures</h4>
+<p>A volatility-based trend line that flips above (bearish) or below (bullish) the price. Built on ATR — adapts to market volatility.</p>
+
+<div class="code">ATR = Average True Range (7 periods)
+Upper Band = (High+Low)/2 + 2.5 x ATR
+Lower Band = (High+Low)/2 - 2.5 x ATR
+
+Direction:
+  Price closes above Upper &rarr; BULL (line = lower)
+  Price closes below Lower &rarr; BEAR (line = upper)
+
+Vote:
+  Direction = 1 &rarr; BULL (+1 vote)
+  Direction = -1 &rarr; BEAR (+0 votes)
+
+Parameters: period=7, multiplier=2.5
+(Faster than default 10/3.0 for intraday)</div>
+
+<h4>Known Limitation</h4>
+<p>On Jan-Mar 2026 real data, Supertrend said BULL on <strong>100% of candles</strong>. It never flipped bearish because NIFTY's decline was gradual, not sharp enough to break the ATR bands. This is why V3 replaced it.</p>
+</div>
+<div>
+<div class="chart-mock">
+<div class="title">Supertrend — Price vs Dynamic Line</div>
+<div class="line" style="left:5%;right:55%;top:40%;background:#e0e0e0;height:2px;transform:rotate(-6deg);"></div>
+<div class="line" style="left:45%;right:5%;top:55%;background:#e0e0e0;height:2px;transform:rotate(8deg);"></div>
+<div class="line" style="left:5%;right:60%;top:52%;background:#10b981;height:3px;transform:rotate(-2deg);"></div>
+<div class="line" style="left:40%;right:35%;top:37%;background:#ef4444;height:3px;transform:rotate(1deg);"></div>
+<div class="line" style="left:65%;right:5%;top:44%;background:#10b981;height:3px;transform:rotate(4deg);"></div>
+<div class="dot" style="left:38%;top:43%;background:#f59e0b;width:10px;height:10px;border:2px solid #fff;"></div>
+<div class="label" style="left:8%;bottom:18%;color:#10b981;">BULL: Price ABOVE line</div>
+<div class="label" style="left:40%;top:22%;color:#ef4444;">BEAR: Price BELOW line</div>
+</div>
+<div class="callout info">
+<b>Why it still works:</b> The permanent BULL bias accidentally aligns with NIFTY's long-term upward drift. CE trades (which need BULL agreement) get an easy +1 vote, increasing signal generation for the most profitable trade type.
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ 5. V3 INDICATORS ═══ -->
+<h2 id="s5">5. V3 Indicators — Detailed</h2>
+
+<p>V3 replaces RSI and Supertrend with two higher-scoring indicators:</p>
+
+<!-- LinReg -->
+<div class="card a" style="--c:#06b6d4;">
+<h3 style="margin-top:0;">V3-Unique: Linear Regression Slope (20-period) — Score: 88.5/100</h3>
+<div class="grid-2">
+<div>
+<h4>What It Measures</h4>
+<p>The mathematical slope of a best-fit line through the last 20 price points. Positive slope = uptrend, negative = downtrend. Zero lag, never gets stuck.</p>
+
+<div class="code">For each candle:
+  x = [0, 1, 2, ..., 19]  (candle positions)
+  y = [close prices for last 20 candles]
+  slope = numpy.polyfit(x, y, degree=1)[0]
+
+Vote:
+  slope > 0  &rarr; BULL (+1 vote)
+  slope < 0  &rarr; BEAR (+0 votes)
+  slope = 0  &rarr; NEUTRAL (+0.5 votes)
+
+Why it's #1 ranked (88.5/100):
+  Balance:   46% bull / 54% bear (near perfect)
+  Alignment: 87% agreement with actual direction
+  Stability: 3.7 flips/day (very stable)
+  Lead:      82% accuracy predicting 3 bars ahead
+  No neutral: 99.9% always gives direction</div>
+</div>
+<div>
+<div class="chart-mock">
+<div class="title">Linear Regression Slope</div>
+<div class="line" style="left:10%;right:55%;top:60%;background:#e0e0e0;height:2px;transform:rotate(-10deg);"></div>
+<div class="line" style="left:45%;right:10%;top:35%;background:#e0e0e0;height:2px;transform:rotate(12deg);"></div>
+<!-- Regression lines -->
+<div class="line" style="left:10%;right:65%;top:55%;background:#10b981;height:2px;transform:rotate(-6deg);border:1px dashed #10b981;"></div>
+<div class="line" style="left:35%;right:40%;top:50%;background:#ef4444;height:2px;transform:rotate(3deg);border:1px dashed #ef4444;"></div>
+<div class="line" style="left:60%;right:10%;top:38%;background:#10b981;height:2px;transform:rotate(8deg);border:1px dashed #10b981;"></div>
+<div class="label" style="left:8%;top:40%;color:#10b981;">Slope &gt; 0<br>BULL</div>
+<div class="label" style="left:35%;top:56%;color:#ef4444;">Slope &lt; 0<br>BEAR</div>
+<div class="label" style="right:10%;top:22%;color:#10b981;">Slope &gt; 0<br>BULL</div>
+<div class="label" style="right:8%;bottom:8%;color:#9ca3af;font-size:0.7em;">-- = regression line</div>
+</div>
+<div class="callout ok">
+<b>Key advantage:</b> Unlike Supertrend which was stuck BULL for 3 months, LinReg detected 54% bearish periods correctly. It's mathematically impossible for it to get stuck — the slope changes with every new candle.
+</div>
+</div>
+</div>
+</div>
+
+<!-- Awesome Oscillator -->
+<div class="card a" style="--c:#f59e0b;">
+<h3 style="margin-top:0;">V3-Unique: Awesome Oscillator (5/34) — Score: 87.5/100</h3>
+<div class="grid-2">
+<div>
+<h4>What It Measures</h4>
+<p>Momentum using the difference between 5-period and 34-period Simple Moving Averages of the median price (High+Low)/2. Positive = bullish momentum accelerating, negative = bearish.</p>
+
+<div class="code">median_price = (High + Low) / 2
+
+AO = SMA(median_price, 5) - SMA(median_price, 34)
+
+Vote:
+  AO > 0 &rarr; BULL (+1 vote)
+  AO < 0 &rarr; BEAR (+0 votes)
+
+Why it's #2 ranked (87.5/100):
+  Balance:   44% bull / 56% bear (balanced)
+  Alignment: 87% agreement with actual direction
+  Stability: 3.3 flips/day (most stable)
+  Lead:      80% accuracy 3 bars ahead
+  No neutral: 100% always gives direction</div>
+</div>
+<div>
+<div class="chart-mock">
+<div class="title">Awesome Oscillator — Momentum Bars</div>
+<div style="position:absolute;left:5%;right:5%;top:50%;height:1px;background:#374151;"></div>
+<div style="position:absolute;left:8%;width:3%;bottom:50%;height:12%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+<div style="position:absolute;left:13%;width:3%;bottom:50%;height:22%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+<div style="position:absolute;left:18%;width:3%;bottom:50%;height:32%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+<div style="position:absolute;left:23%;width:3%;bottom:50%;height:20%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+<div style="position:absolute;left:28%;width:3%;bottom:50%;height:6%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+<div style="position:absolute;left:33%;width:3%;top:50%;height:8%;background:#ef4444;border-radius:0 0 2px 2px;"></div>
+<div style="position:absolute;left:38%;width:3%;top:50%;height:20%;background:#ef4444;border-radius:0 0 2px 2px;"></div>
+<div style="position:absolute;left:43%;width:3%;top:50%;height:35%;background:#ef4444;border-radius:0 0 2px 2px;"></div>
+<div style="position:absolute;left:48%;width:3%;top:50%;height:28%;background:#ef4444;border-radius:0 0 2px 2px;"></div>
+<div style="position:absolute;left:53%;width:3%;top:50%;height:12%;background:#ef4444;border-radius:0 0 2px 2px;"></div>
+<div style="position:absolute;left:58%;width:3%;bottom:50%;height:5%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+<div style="position:absolute;left:63%;width:3%;bottom:50%;height:18%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+<div class="label" style="left:12%;top:10%;color:#10b981;">AO &gt; 0 = BULL</div>
+<div class="label" style="left:38%;bottom:8%;color:#ef4444;">AO &lt; 0 = BEAR</div>
+</div>
+<div class="callout info">
+<b>vs MACD:</b> AO uses median price (not close) and SMA (not EMA), making it smoother and less prone to whipsaws. It's like a calmer version of MACD that filters out intraday noise.
+</div>
+</div>
+</div>
+</div>
+
+<!-- ═══ 6. SHARED INDICATORS ═══ -->
+<h2 id="s6">6. Shared Indicators (Both V1 & V3)</h2>
+
+<p>These 4 indicators are identical in both versions:</p>
+
+<div class="grid-2">
+<div class="ind-box" style="--c:#3b82f6;">
+<div class="type">Indicator 1</div>
+<div class="name">EMA Crossover (5/13)</div>
+<div class="code" style="font-size:0.78em;margin:6px 0;">EMA5 > EMA13 &rarr; BULL
+EMA5 < EMA13 &rarr; BEAR
+Faster than 9/21 — catches reversals 15-25 min earlier</div>
+<p style="font-size:0.82em;">Score: 86.3 | Balance: 45/55 | Alignment: 85% | Stability: 5.3 flips/day</p>
+</div>
+
+<div class="ind-box" style="--c:#10b981;">
+<div class="type">Indicator 2</div>
+<div class="name">Price vs EMA 20</div>
+<div class="code" style="font-size:0.78em;margin:6px 0;">Price > EMA20 &rarr; BULL
+Price < EMA20 &rarr; BEAR
+No NEUTRAL — always gives direction</div>
+<p style="font-size:0.82em;">Score: 81.6 | Balance: 45/55 | Alignment: 84% | 100% agreement on all trades</p>
+</div>
+
+<div class="ind-box" style="--c:#f59e0b;">
+<div class="type">Indicator 4</div>
+<div class="name">MACD (12/26/9)</div>
+<div class="code" style="font-size:0.78em;margin:6px 0;">MACD = EMA(12) - EMA(26)
+Signal = EMA(MACD, 9)
+Histogram > 0 &rarr; BULL | < 0 &rarr; BEAR</div>
+<p style="font-size:0.82em;">Score: 80.7 | Best balance (51/49) | Detects momentum shifts | Lags 3-5 candles on reversals</p>
+</div>
+
+<div class="ind-box" style="--c:#06b6d4;">
+<div class="type">Indicator 6 — STRICT GATE</div>
+<div class="name">Price Action (3-bar slope)</div>
+<div class="code" style="font-size:0.78em;margin:6px 0;">slope = (Close[-1] - Close[-3]) / Close[-3]
+slope > +0.02% &rarr; BULL | < -0.02% &rarr; BEAR
+CE REQUIRES BULL. PE REQUIRES BEAR. No exceptions.</div>
+<p style="font-size:0.82em;">Score: 61.7 (lowest) BUT most valuable gate. Reduced max drawdown by 42% on real data. Only real-time (non-lagging) indicator in the system.</p>
+</div>
+</div>
+
+<!-- ═══ 7. GATES ═══ -->
+<h2 id="s7">7. The 8-Gate Filter System</h2>
+
+<p>Every signal must pass ALL 8 gates. Each gate was added to solve a specific problem found in backtesting.</p>
+
+<div class="gate">
+<div class="gate-item pass"><div class="gn">GATE 1</div><div class="gv">Trend</div><div class="gd">Bull &ge;60%<br>Bear &ge;55%</div></div>
+<div class="gate-item pass"><div class="gn">1b</div><div class="gv">Exhaust</div><div class="gd">Strength<br>&lt; 92%</div></div>
+<div class="gate-item pass"><div class="gn">GATE 2</div><div class="gv">RSI Cap</div><div class="gd">CE: &lt;75<br>PE: &gt;20</div></div>
+<div class="gate-item pass"><div class="gn">2b</div><div class="gv">RSI Dead</div><div class="gd">Not 48-57<br><em>*relaxed PM</em></div></div>
+<div class="gate-item pass"><div class="gn">2c</div><div class="gv">Daily Bias</div><div class="gd">CE if day up<br><em>*relaxed PM</em></div></div>
+<div class="gate-item pass"><div class="gn">GATE 3</div><div class="gv">Price Action</div><div class="gd">MUST agree<br><strong>NEVER relaxed</strong></div></div>
+<div class="gate-item pass"><div class="gn">4-5</div><div class="gv">Limits</div><div class="gd">2/day max<br>30m cooldown</div></div>
+<div class="gate-item pass"><div class="gn">GATE 6</div><div class="gv">Risk</div><div class="gd">P&L &gt; -5K<br>Pos &lt; 2</div></div>
+</div>
+
+<div class="callout info">
+<b>Afternoon Relaxed Mode:</b> After 1:30 PM with 0 trades today, gates 2b (RSI dead zone) and 2c (daily bias) are relaxed to find at least 1 trade. This added +10,432 to January P&L and recovered +4,513 in February. Gates 1, 1b, 2, 3, 4-6 are <strong>never</strong> relaxed.
+</div>
+
+<!-- ═══ 8. STRATEGIES ═══ -->
+<h2 id="s8">8. Trading Strategies: Momentum & OI Reversal</h2>
+
+<div class="grid-2">
+<div class="card a" style="--c:#3b82f6;">
+<h3 style="margin-top:0;">Strategy 1: Momentum Breakout</h3>
+<p>Buy options in the direction of confirmed trend when a high-scoring, liquid option with volume &gt; 10,000 is found.</p>
+<div class="code">Entry: Score &ge; 50, Volume &gt; 10K, Premium 50-500
+SL: ATR-based (multiplier 1.5, floor 15%)
+Target: Entry + (risk x 2.0 R:R)
+Result: 20% WR on real data (weak)</div>
+</div>
+<div class="card a" style="--c:#10b981;">
+<h3 style="margin-top:0;">Strategy 2: OI Reversal</h3>
+<p>Buy options at strikes where Open Interest confirms support/resistance. High Put OI = support &rarr; buy CE. High Call OI = resistance &rarr; buy PE.</p>
+<div class="code">Entry: OI &gt; 200K at nearby strike confirms level
+SL: Same ATR-based calculation
+Target: Same R:R ratio
+Result: 68% WR on real data (dominant strategy)</div>
+</div>
+</div>
+
+<div class="callout ok">
+<b>OI Reversal is the primary profit generator</b> across all backtesting. It generated +79K in Nov 2025 alone (82% WR). Momentum strategy consistently underperforms — consider removing it entirely.
+</div>
+
+<!-- ═══ 9. RISK MANAGEMENT ═══ -->
+<h2 id="s9">9. Risk Management & Position Sizing</h2>
+
+<div class="grid-2">
+<div class="card a" style="--c:#ef4444;">
+<h4 style="margin-top:0;">Hard Limits</h4>
+<table>
+<tr><td>Max loss per trade</td><td><strong>Rs.2,000</strong></td></tr>
+<tr><td>Max loss per day</td><td><strong>Rs.5,000</strong></td></tr>
+<tr><td>Max open positions</td><td>2</td></tr>
+<tr><td>Max trades per day</td><td>2 per underlying</td></tr>
+<tr><td>Min R:R ratio</td><td>1.5</td></tr>
+<tr><td>Min SL %</td><td>15% of premium</td></tr>
+</table>
+</div>
+<div class="card a" style="--c:#f59e0b;">
+<h4 style="margin-top:0;">Position Sizing</h4>
+<div class="code">risk_per_unit = |Entry - SL|
+max_units = 2,000 / risk_per_unit
+lots = max(floor(max_units / 75), 1)
+quantity = lots x 75
+
+SL = Entry - (ATR x 1.5 x 0.4)
+Floor: SL &ge; Entry x 0.85 (min 15%)
+Cap: SL &ge; Entry x 0.50 (max 50%)</div>
+</div>
+</div>
+
+<!-- ═══ 10. EXIT LOGIC ═══ -->
+<h2 id="s10">10. Exit Logic & Trailing Stop Loss</h2>
+
+<table>
+<tr><th>#</th><th>Condition</th><th>Action</th></tr>
+<tr><td>1</td><td>Price &le; Trailing SL</td><td>Immediate exit (hard SL or trailing)</td></tr>
+<tr><td>2</td><td>EOD 3:15 PM</td><td>Square off all MIS</td></tr>
+<tr><td>3</td><td>50% of target + qty &gt; 1 lot</td><td>Partial: sell 50%, trail to breakeven</td></tr>
+<tr><td>4</td><td>Price &ge; Target + held &ge; 10 candles</td><td>Full exit at target</td></tr>
+<tr><td>5</td><td>4-stage trailing SL (below)</td><td>Progressive SL tightening</td></tr>
+<tr><td>6</td><td>Held &gt; 2 hours with &lt; 10% profit</td><td>Exit (theta decay)</td></tr>
+</table>
+
+<div class="card">
+<h4>4-Stage Trailing Stop Loss</h4>
+<div class="code">move_pct = (Current - Entry) / (Target - Entry) x 100
+
+Stage 1: move &ge; 20% &rarr; SL = Entry (breakeven, risk-free)
+Stage 2: move &ge; 50% &rarr; SL = Entry + 30% of profit
+Stage 3: move &ge; 70% &rarr; SL = Entry + 50% of profit
+Stage 4: move &ge; 85% &rarr; SL = Entry + 70% of profit
+
+Example (Entry=200, SL=170, Target=260):
+  Price 212 (20%): SL 170 &rarr; 200 (breakeven)
+  Price 230 (50%): SL &rarr; 209
+  Price 242 (70%): SL &rarr; 221
+  Price 251 (85%): SL &rarr; 236</div>
+</div>
+
+<!-- ═══ 11. BACKTESTING RESULTS ═══ -->
+<h2 id="s11">11. Backtesting Results (Real Data, Jan-Mar 2026)</h2>
+
+<div class="card">
+<h4>V1 Backtest — 53 trading days, real NIFTY 5-min data from Yahoo Finance</h4>
+<table>
+<tr><td>Net P&L</td><td><span class="metric g">+35,804</span></td><td>Sharpe</td><td><span class="metric g">3.86</span></td></tr>
+<tr><td>Win Rate</td><td>46.9%</td><td>Profit Factor</td><td><span class="metric g">2.54</span></td></tr>
+<tr><td>Max Drawdown</td><td><span class="metric r">-6,597 (5.4%)</span></td><td>Expectancy</td><td>+1,119/trade</td></tr>
+<tr><td>Avg Winner</td><td>+3,937</td><td>Avg Loser</td><td>-1,367</td></tr>
+<tr><td>Trades</td><td>32</td><td>Consec Losses</td><td>4</td></tr>
+</table>
+
+<h4>Monthly</h4>
+<table>
+<tr><th>Month</th><th>Trades</th><th>WR</th><th>P&L</th><th>ROI</th></tr>
+<tr><td>January</td><td>12</td><td>58%</td><td class="metric g">+13,128</td><td>+13.1%</td></tr>
+<tr><td>February</td><td>12</td><td>33%</td><td class="metric g">+7,422</td><td>+7.4%</td></tr>
+<tr><td>March</td><td>8</td><td>50%</td><td class="metric g">+15,254</td><td>+15.3%</td></tr>
+<tr style="background:#1a2240;"><td><strong>Average</strong></td><td><strong>11</strong></td><td><strong>47%</strong></td><td><strong class="metric g">+11,935</strong></td><td><strong>+11.9%</strong></td></tr>
+</table>
+</div>
+
+<div class="card">
+<h4>Paper Trading — V1 vs V3 (58 trading days, Rs.50K each)</h4>
+<table>
+<tr><th></th><th>V1 (Supertrend+RSI)</th><th>V3 (LinReg+AO)</th></tr>
+<tr><td>Final Capital</td><td><strong>Rs.88,996</strong></td><td>Rs.63,897</td></tr>
+<tr><td>ROI</td><td><strong>+78.0%</strong></td><td>+27.8%</td></tr>
+<tr><td>Trades</td><td>69</td><td>68</td></tr>
+<tr><td>Win Rate</td><td>33.3%</td><td>23.5%</td></tr>
+</table>
+</div>
+
+<!-- ═══ 12. PAPER TRADING ═══ -->
+<h2 id="s12">12. Paper Trading Setup</h2>
+
+<div class="card">
+<h4>Architecture</h4>
+<div class="code">Data Source:     Dhan API (real option chain, LTP, OI)
+                 Fallback: Yahoo Finance (free, 5-min delay)
+Strategy:        V1 + V3 running in parallel
+Capital:         Rs.50,000 per version (fake money)
+Polling:         Every 2 minutes during market hours
+Orders:          Logged to JSON (no real money at risk)
+Monitoring:      Real-time trailing SL on every tick
+Dashboard:       HTML comparison report on demand</div>
+
+<h4>Commands</h4>
+<div class="code"># Start live paper trading (Dhan)
+python -m paper_trading.dhan_paper --live
+
+# Start with Yahoo Finance (no Dhan needed)
+python -m paper_trading.run --live
+
+# Simulate on recent data
+python -m paper_trading.run --simulate --days 20
+
+# Check status
+python -m paper_trading.dhan_paper --status
+
+# Generate comparison dashboard
+python -m paper_trading.run --dashboard
+
+# Reset
+python -m paper_trading.run --reset</div>
+</div>
+
+<!-- ═══ 13. DEPLOYMENT ═══ -->
+<h2 id="s13">13. Deployment & Operations</h2>
+
+<div class="card">
+<h4>Auto-Start on macOS (Market Days Only)</h4>
+<div class="code"># Install auto-scheduler (one time)
+cp com.nifty.papertrading.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.nifty.papertrading.plist
+
+# Auto-starts Mon-Fri at 9:10 AM
+# Auto-stops after market close
+# Logs to data/logs/paper_trading_YYYYMMDD.log
+
+# Stop manually
+bash scripts/stop_paper_trading.sh
+
+# Uninstall
+launchctl unload ~/Library/LaunchAgents/com.nifty.papertrading.plist</div>
+
+<h4>Cloud Deployment (for production)</h4>
+<table>
+<tr><th>Platform</th><th>Cost</th><th>Best For</th></tr>
+<tr><td>Your Mac (launchd)</td><td>Free</td><td>Paper trading</td></tr>
+<tr><td>AWS EC2 (t2.micro)</td><td>Free 1 year</td><td>Live trading</td></tr>
+<tr><td>Railway.app</td><td>Free (500 hrs)</td><td>Paper trading</td></tr>
+<tr><td>DigitalOcean</td><td>Rs.330/month</td><td>Live trading</td></tr>
+</table>
+
+<h4>Going Live (Kite Connect)</h4>
+<div class="code">1. Subscribe to Kite Connect (Rs.2,000/month)
+2. Fill .env with API keys
+3. python main.py
+4. Start with 1 lot (75 units), MAX_LOSS_PER_DAY = 1,000
+5. Validate for 1 month before scaling up</div>
+</div>
+
+<div class="callout danger">
+<b>Regulatory Note:</b> Options trading involves substantial risk. This system is a tool, not guaranteed profit. Trade only with capital you can afford to lose. For personal use only — commercial use requires SEBI registration.
+</div>
+
+<p style="text-align:center;color:#374151;margin-top:60px;font-size:0.82em;">
+NIFTY Options AI Agent — Complete System Documentation v5.0 — March 2026<br>
+Backtested on real NIFTY data (Yahoo Finance) | Paper traded V1 & V3 with Rs.50K each
+</p>
+
+</body>
+</html>

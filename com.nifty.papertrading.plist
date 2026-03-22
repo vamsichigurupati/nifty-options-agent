@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nifty.papertrading</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/vamsikrishna.c/nifty-options-agent/scripts/start_paper_trading.sh</string>
+    </array>
+    <!-- Run Mon-Fri at 9:10 AM IST -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>10</integer></dict>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/vamsikrishna.c/nifty-options-agent</string>
+    <key>StandardOutPath</key>
+    <string>/Users/vamsikrishna.c/nifty-options-agent/data/logs/launchd_out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/vamsikrishna.c/nifty-options-agent/data/logs/launchd_err.log</string>
+</dict>
+</plist>
