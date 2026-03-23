@@ -514,7 +514,8 @@ def main():
             traders[vid] = DhanPaperTrader(vid, detect_fn, broker, args.capital)
 
         logger.info(f"Starting Dhan paper trading — V1 + V3, Rs.{args.capital:,.0f} each")
-        logger.info("Polling every 2 minutes. Press Ctrl+C to stop.\n")
+        logger.info("Polling: 2 min (scanning) / 1 min (when trade open)")
+        logger.info("Press Ctrl+C to stop.\n")
 
         while True:
             now = datetime.now()
@@ -532,7 +533,7 @@ def main():
                 logger.info(f"NIFTY: {spot_price:.2f}")
             except Exception as e:
                 logger.error(f"Spot fetch failed: {e}")
-                time.sleep(120); continue
+                time.sleep(60); continue
 
             for vid, trader in traders.items():
                 try:
@@ -541,12 +542,19 @@ def main():
                     logger.error(f"[{vid}] Error: {e}")
 
             # Status
+            any_open = False
             for vid, trader in traders.items():
                 s = trader.get_summary()
                 status = "OPEN" if s["open_trade"] else "idle"
+                if s["open_trade"]:
+                    any_open = True
                 logger.info(f"  [{vid[:6]}] P&L={s['pnl']:+,.0f} | {s['trades']} trades | {status}")
 
-            time.sleep(120)  # 2 minutes
+            # Adaptive polling: 1 min when trade open, 2 min when scanning
+            if any_open:
+                time.sleep(60)   # 1 min — tighter exit monitoring
+            else:
+                time.sleep(120)  # 2 min — normal scanning
 
     if args.dashboard:
         from paper_trading.run import generate_dashboard
