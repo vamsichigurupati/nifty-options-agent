@@ -242,6 +242,93 @@ a{{color:#3b82f6;text-decoration:none;}}
 </body></html>"""
 
 
+@app.route("/live", methods=["GET"])
+def live_page():
+    """Live agent decisions — what is it thinking right now?"""
+    live_dir = Path(__file__).parent.parent / "data" / "live_status"
+    versions = []
+
+    for f in sorted(live_dir.glob("*.json")) if live_dir.exists() else []:
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            versions.append(data)
+        except Exception:
+            pass
+
+    cards = ""
+    for v in versions:
+        # Indicator tags
+        indicators = v.get("indicators", {})
+        ind_html = ""
+        for name, signal in indicators.items():
+            cls = "bull" if signal == "BULL" else ("bear" if signal == "BEAR" else "neut")
+            ind_html += f'<span class="tag {cls}">{name}: {signal}</span> '
+
+        trend = v.get("trend", "—")
+        trend_cls = "bull" if trend == "BULLISH" else ("bear" if trend == "BEARISH" else "neut")
+        pnl = v.get("pnl", 0)
+        pnl_cls = "pos" if pnl >= 0 else "neg"
+
+        # Open trade
+        ot_html = ""
+        ot = v.get("open_trade")
+        if ot:
+            ep = ot.get("est_pnl", 0)
+            ep_cls = "pos" if ep >= 0 else "neg"
+            ot_html = (f'<div style="background:#172554;border:1px solid #3b82f6;border-radius:8px;'
+                       f'padding:10px;margin:8px 0;font-size:0.85em;">'
+                       f'OPEN: {ot["symbol"]} {ot["type"]} @ {ot["entry"]:.2f} | '
+                       f'SL: {ot["sl"]:.2f} | TGT: {ot["target"]:.2f} | '
+                       f'Est P&L: <span class="{ep_cls}">{ep:+,.0f}</span></div>')
+
+        cards += f"""<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+<b style="color:#00d4ff;">{v.get('version','')[:15]}</b>
+<span style="color:#6b7280;font-size:0.8em;">{v.get('time','')}</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;margin-bottom:10px;">
+<div><div class="v">{v.get('spot',0):,.2f}</div><div class="l">NIFTY</div></div>
+<div><div class="v {trend_cls}">{trend}</div><div class="l">Trend {v.get('trend_strength',0):.0f}%</div></div>
+<div><div class="v">{v.get('rsi',0):.0f}</div><div class="l">RSI</div></div>
+</div>
+<div style="margin:8px 0;">{ind_html}</div>
+{ot_html}
+<div style="background:#0a0f1e;border:1px solid #253050;border-radius:8px;padding:10px;margin:8px 0;font-size:0.88em;">
+{v.get('decision','Waiting...')}
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;font-size:0.8em;color:#6b7280;">
+<div>P&L: <span class="{pnl_cls}">{pnl:+,.0f}</span></div>
+<div>Trades: {v.get('trades_today',0)} today</div>
+<div>Candles: {v.get('candles',0)}</div>
+</div></div>"""
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Live View</title>
+<meta http-equiv="refresh" content="30">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box;}}
+body{{font-family:system-ui;background:#0a0e1a;color:#e0e0e0;padding:16px;}}
+h2{{text-align:center;color:#00d4ff;margin-bottom:12px;font-size:1.3em;}}
+.card{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:14px;margin:10px 0;}}
+.v{{font-size:1.1em;font-weight:800;}} .l{{font-size:0.65em;color:#6b7280;}}
+.pos{{color:#10b981;}} .neg{{color:#ef4444;}}
+.bull{{color:#10b981;}} .bear{{color:#ef4444;}} .neut{{color:#a3a3a3;}}
+.tag{{display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.7em;font-weight:600;margin:2px;}}
+.tag.bull{{background:#064e3b;border:1px solid #10b981;}}
+.tag.bear{{background:#450a0a;border:1px solid #ef4444;}}
+.tag.neut{{background:#1c1917;border:1px solid #525252;}}
+.nav{{text-align:center;margin:10px 0;font-size:0.85em;}}
+a{{color:#3b82f6;text-decoration:none;}}
+</style></head><body>
+<h2>Agent Live View</h2>
+<div class="nav"><a href="/">Token</a> | <a href="/trades">Trades</a> | <a href="/live">Live</a> | <a href="/status">Status</a></div>
+{cards if cards else '<div class="card"><p style="color:#6b7280;text-align:center;">No live data yet. Agent is starting up.</p></div>'}
+<p style="text-align:center;color:#374151;font-size:0.7em;margin-top:12px;">Auto-refreshes every 30 seconds</p>
+</body></html>"""
+
+
 @app.route("/update-token", methods=["GET"])
 def update_token_url():
     """URL-based update (for bookmarks/shortcuts)."""

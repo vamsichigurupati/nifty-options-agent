@@ -149,6 +149,9 @@ class DhanPaperTrader:
         if len(self.spot_buffer) > 500:
             self.spot_buffer = self.spot_buffer.iloc[-500:]
 
+        # Write live status every tick
+        self._write_live_status(spot_price, current_time)
+
         if self.open_trade:
             return self._monitor_position(spot_price, current_time)
 
@@ -354,6 +357,93 @@ class DhanPaperTrader:
         self._save_state()
         logger.info(f"[{self.version_id}] SELL {t['symbol']} @ {exit_price:.2f} "
                      f"{reason} P&L={t['pnl']:+,.0f} Capital={self.capital:,.0f}")
+
+    def _write_live_status(self, spot_price: float, current_time: datetime):
+        """Write agent's current thinking to a JSON file for the web dashboard."""
+        try:
+            status = {
+                "version": self.version_id,
+                "time": current_time.strftime("%H:%M:%S"),
+                "spot": round(spot_price, 2),
+                "candles": len(self.spot_buffer),
+                "trades_today": self.trades_today,
+                "capital": round(self.capital, 2),
+                "pnl": round(self.capital - self.initial_capital, 2),
+            }
+
+            # Run trend detection if enough candles
+            if len(self.spot_buffer) >= 50:
+                spot_5m = self.spot_buffer.set_index("date").resample("5min").agg({
+                    "open": "first", "high": "max", "low": "min",
+                    "close": "last", "volume": "sum"
+                }).dropna().reset_index()
+
+                if len(spot_5m) >= 20:
+                    trend = self.detect_trend(spot_5m)
+                    direction = "BULLISH" if trend["direction"] == 1 else (
+                        "BEARISH" if trend["direction"] == -1 else "NEUTRAL")
+                    status["trend"] = direction
+                    status["trend_strength"] = trend.get("strength", 0)
+                    status["rsi"] = trend.get("rsi", 0)
+                    status["indicators"] = trend.get("details", {})
+
+                    # What the agent decided
+                    reasons = []
+                    if trend["direction"] == 0:
+                        reasons.append("No clear trend — sitting out")
+                    elif trend["strength"] > self.PARAMS["max_trend_strength"]:
+                        reasons.append(f"Trend exhausted ({trend['strength']:.0f}%) — too late to enter")
+                    else:
+                        rsi_val = trend.get("rsi", 50)
+                        target_type = "CE" if trend["direction"] == 1 else "PE"
+
+                        if target_type == "CE" and rsi_val > self.PARAMS["max_rsi_ce"]:
+                            reasons.append(f"RSI too high ({rsi_val:.0f}) for CE — overbought")
+                        elif target_type == "PE" and rsi_val < 20:
+                            reasons.append(f"RSI too low ({rsi_val:.0f}) for PE — oversold")
+                        elif self.PARAMS["rsi_dead_zone_lo"] <= rsi_val <= self.PARAMS["rsi_dead_zone_hi"]:
+                            reasons.append(f"RSI in dead zone ({rsi_val:.0f}) — no conviction")
+                        else:
+                            pa = trend.get("details", {}).get("price_action", "NEUTRAL")
+                            if target_type == "CE" and pa != "BULL":
+                                reasons.append(f"Price action is {pa}, not BULL — waiting for confirmation")
+                            elif target_type == "PE" and pa != "BEAR":
+                                reasons.append(f"Price action is {pa}, not BEAR — waiting for confirmation")
+                            elif self.trades_today >= self.PARAMS["max_trades_per_day"]:
+                                reasons.append("Max trades for today reached")
+                            elif self.open_trade:
+                                reasons.append(f"Already in a trade: {self.open_trade.get('symbol', '')}")
+                            else:
+                                reasons.append(f"Looking for {target_type} entry — all gates passing")
+
+                    status["decision"] = " | ".join(reasons) if reasons else "Scanning..."
+                else:
+                    status["decision"] = f"Building 5-min candles ({len(spot_5m)}/20 needed)"
+            else:
+                status["decision"] = f"Accumulating candles ({len(self.spot_buffer)}/50 needed)"
+
+            # Open trade info
+            if self.open_trade:
+                t = self.open_trade
+                delta = 0.4 if t["type"] == "CE" else -0.4
+                est_pnl = (spot_price - t["spot_at_entry"]) * delta * t["quantity"]
+                status["open_trade"] = {
+                    "symbol": t["symbol"],
+                    "type": t["type"],
+                    "entry": t["entry_price"],
+                    "sl": t["stop_loss"],
+                    "target": t["target"],
+                    "est_pnl": round(est_pnl, 0),
+                }
+
+            # Write to file
+            live_dir = Path(__file__).parent.parent / "data" / "live_status"
+            live_dir.mkdir(parents=True, exist_ok=True)
+            with open(live_dir / f"{self.version_id}.json", "w") as f:
+                json.dump(status, f, indent=2, default=str)
+
+        except Exception as e:
+            logger.debug(f"[{self.version_id}] Live status write error: {e}")
 
     def _save_state(self):
         state = {"version_id": self.version_id, "capital": self.capital,
