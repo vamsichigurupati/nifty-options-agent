@@ -151,6 +151,97 @@ def status():
     return {"status": "ok", "service": service, "last_token_update": last}
 
 
+@app.route("/trades", methods=["GET"])
+def trades_page():
+    """View all paper trades from phone."""
+    from paper_trading.versions import VERSION_CONFIG
+    trades_dir = Path(__file__).parent.parent / "data" / "dhan_paper_trades"
+
+    versions = {}
+    for vid, cfg in VERSION_CONFIG.items():
+        path = trades_dir / f"{vid}.json"
+        if path.exists():
+            with open(path) as f:
+                state = json.load(f)
+            capital = state.get("capital", 50000)
+            initial = state.get("initial_capital", 50000)
+            all_trades = state.get("trades", [])
+            open_trade = state.get("open_trade")
+            closed = [t for t in all_trades if t.get("status") == "CLOSED"]
+            winners = [t for t in closed if (t.get("pnl") or 0) > 0]
+            pnl = capital - initial
+            wr = round(len(winners) / max(len(closed), 1) * 100, 1)
+            versions[vid] = {
+                "name": cfg["name"], "color": cfg["color"],
+                "capital": capital, "pnl": pnl, "roi": round(pnl / initial * 100, 1),
+                "trades": len(closed), "winners": len(winners),
+                "losers": len(closed) - len(winners), "win_rate": wr,
+                "closed": closed, "open_trade": open_trade,
+            }
+
+    # Build HTML
+    cards = ""
+    for vid, v in versions.items():
+        pnl_cls = "pos" if v["pnl"] >= 0 else "neg"
+        open_html = ""
+        if v["open_trade"]:
+            ot = v["open_trade"]
+            open_html = (f'<div style="background:#172554;border:1px solid #3b82f6;border-radius:8px;'
+                         f'padding:10px;margin:8px 0;font-size:0.82em;">'
+                         f'OPEN: {ot.get("symbol","")} {ot.get("type","")} @ {ot.get("entry_price",0):.2f} '
+                         f'SL={ot.get("stop_loss",0):.2f} TGT={ot.get("target",0):.2f}</div>')
+
+        trade_rows = ""
+        for t in reversed(v["closed"][-20:]):
+            p = t.get("pnl", 0)
+            cls = "pos" if p > 0 else "neg"
+            entry = t.get("entry_time", "")[:16]
+            trade_rows += (f'<tr><td>{t.get("id","")}</td><td>{entry}</td>'
+                          f'<td>{t.get("symbol","")[:16]}</td>'
+                          f'<td class="{cls}">{p:+,.0f}</td>'
+                          f'<td>{t.get("exit_reason","")}</td></tr>')
+
+        cards += f"""<div class="card" style="border-top:3px solid {v['color']};">
+<h3 style="color:{v['color']};margin:0 0 10px;">{v['name']}</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center;">
+<div><div class="v {pnl_cls}">{v['pnl']:+,.0f}</div><div class="l">P&L</div></div>
+<div><div class="v {pnl_cls}">{v['roi']:+.1f}%</div><div class="l">ROI</div></div>
+<div><div class="v">{v['trades']}</div><div class="l">Trades</div></div>
+<div><div class="v">{v['win_rate']}%</div><div class="l">Win Rate</div></div>
+</div>
+{open_html}
+<table style="width:100%;border-collapse:collapse;font-size:0.78em;margin-top:10px;">
+<tr style="background:#1a2240;"><th style="padding:6px;text-align:left;color:#00d4ff;">#</th>
+<th style="padding:6px;text-align:left;color:#00d4ff;">Time</th>
+<th style="padding:6px;text-align:left;color:#00d4ff;">Symbol</th>
+<th style="padding:6px;text-align:left;color:#00d4ff;">P&L</th>
+<th style="padding:6px;text-align:left;color:#00d4ff;">Exit</th></tr>
+{trade_rows if trade_rows else '<tr><td colspan="5" style="padding:10px;color:#6b7280;">No trades yet</td></tr>'}
+</table></div>"""
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paper Trading Dashboard</title>
+<meta http-equiv="refresh" content="120">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box;}}
+body{{font-family:system-ui;background:#0a0e1a;color:#e0e0e0;padding:16px;}}
+h2{{text-align:center;color:#00d4ff;margin-bottom:16px;font-size:1.3em;}}
+.card{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:16px;margin:12px 0;}}
+.card h3{{font-size:1em;}}
+.v{{font-size:1.2em;font-weight:800;}} .l{{font-size:0.65em;color:#6b7280;}}
+.pos{{color:#10b981;}} .neg{{color:#ef4444;}}
+table td{{padding:5px 6px;border-bottom:1px solid #1a2040;}}
+a{{color:#3b82f6;text-decoration:none;}}
+.nav{{text-align:center;margin:12px 0;font-size:0.85em;}}
+</style></head><body>
+<h2>Paper Trading</h2>
+<div class="nav"><a href="/">Update Token</a> | <a href="/trades">Trades</a> | <a href="/status">Status</a></div>
+{cards if cards else '<div class="card"><p style="color:#6b7280;text-align:center;">No trading data yet. System is accumulating candles.</p></div>'}
+<p style="text-align:center;color:#374151;font-size:0.7em;margin-top:16px;">Auto-refreshes every 2 minutes</p>
+</body></html>"""
+
+
 @app.route("/update-token", methods=["GET"])
 def update_token_url():
     """URL-based update (for bookmarks/shortcuts)."""
