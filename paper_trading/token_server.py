@@ -38,12 +38,27 @@ def home():
     if token_file.exists():
         last_update = token_file.read_text().strip()
 
+    # Check token alert
+    alert_html = ""
+    alert_file = Path(__file__).parent.parent / "data" / "token_alert.json"
+    if alert_file.exists():
+        try:
+            alert = json.load(open(alert_file))
+            if alert.get("expired"):
+                alert_html = ('<div style="background:#450a0a;border:2px solid #ef4444;border-radius:10px;'
+                              'padding:12px;margin-bottom:16px;text-align:center;font-weight:700;color:#ef4444;">'
+                              'TOKEN EXPIRED — Update now!</div>')
+        except Exception:
+            pass
+
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dhan Token Update</title>
+<meta http-equiv="refresh" content="60">
 <style>
-body{{font-family:system-ui;background:#0a0e1a;color:#e0e0e0;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;}}
-.card{{background:#111827;border:1px solid #1f2937;border-radius:16px;padding:30px;max-width:400px;width:90%;}}
+body{{font-family:system-ui;background:#0a0e1a;color:#e0e0e0;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;padding:16px;}}
+.wrap{{max-width:400px;width:100%;}}
+.card{{background:#111827;border:1px solid #1f2937;border-radius:16px;padding:30px;}}
 h2{{color:#00d4ff;margin:0 0 20px;text-align:center;}}
 label{{display:block;font-size:0.85em;color:#9ca3af;margin:12px 0 4px;}}
 input{{width:100%;padding:10px;background:#0a0f1e;border:1px solid #253050;color:#e0e0e0;border-radius:8px;font-size:0.9em;box-sizing:border-box;}}
@@ -51,10 +66,13 @@ textarea{{width:100%;padding:10px;background:#0a0f1e;border:1px solid #253050;co
 button{{width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:1em;font-weight:700;cursor:pointer;margin-top:16px;}}
 button:hover{{background:#2563eb;}}
 .status{{text-align:center;font-size:0.8em;color:#6b7280;margin-top:12px;}}
-.ok{{color:#10b981;}} .err{{color:#ef4444;}}
+.nav{{text-align:center;margin:12px 0;font-size:0.85em;}} a{{color:#3b82f6;text-decoration:none;}}
 </style></head><body>
+<div class="wrap">
+{alert_html}
 <div class="card">
 <h2>Dhan Token Update</h2>
+<div class="nav"><a href="/live">Live</a> | <a href="/trades">Trades</a> | <a href="/summary">Summary</a> | <a href="/status">Status</a></div>
 <form method="POST" action="/update">
 <label>Secret Key</label>
 <input type="password" name="secret" required placeholder="Your secret key">
@@ -63,7 +81,7 @@ button:hover{{background:#2563eb;}}
 <button type="submit">Update Token & Restart</button>
 </form>
 <div class="status">Last update: {last_update or 'Never'}</div>
-</div></body></html>"""
+</div></div></body></html>"""
 
 
 @app.route("/update", methods=["POST"])
@@ -132,6 +150,70 @@ def update_token():
     except Exception as e:
         logger.error(f"Token update failed: {e}")
         return _response(f"Error: {e}", "err")
+
+
+@app.route("/summary", methods=["GET"])
+def summary_page():
+    """Daily summaries with gate block statistics."""
+    summary_dir = Path(__file__).parent.parent / "data" / "daily_summaries"
+    summaries = []
+    if summary_dir.exists():
+        for f in sorted(summary_dir.glob("*.json"), reverse=True)[:10]:
+            try:
+                with open(f) as fh:
+                    summaries.append(json.load(fh))
+            except Exception:
+                pass
+
+    cards = ""
+    for day_data in summaries:
+        for vid, s in day_data.items():
+            pnl = s.get("pnl", 0)
+            pnl_cls = "pos" if pnl >= 0 else "neg"
+            gate_html = ""
+            for gate, count in sorted(s.get("gate_blocks", {}).items(), key=lambda x: -x[1]):
+                if gate == "ALL_PASSED":
+                    gate_html += f'<span style="color:#10b981;">{gate}: {count}</span> '
+                else:
+                    gate_html += f'<span style="color:#6b7280;">{gate}: {count}</span> '
+
+            trades_html = ""
+            for t in s.get("trades_detail", []):
+                p = t.get("pnl", 0)
+                tc = "pos" if p > 0 else "neg"
+                trades_html += (f'<div style="font-size:0.78em;padding:3px 0;border-bottom:1px solid #1a2040;">'
+                                f'{t.get("entry_time","")[:16]} {t.get("symbol","")[:14]} '
+                                f'<span class="{tc}">{p:+,.0f}</span> {t.get("exit_reason","")}</div>')
+
+            cards += f"""<div class="card">
+<div style="display:flex;justify-content:space-between;"><b style="color:#00d4ff;">{s.get('date','')}</b>
+<span style="font-size:0.8em;color:#6b7280;">{vid[:10]}</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center;margin:8px 0;">
+<div><div class="v {pnl_cls}">{pnl:+,.0f}</div><div class="l">P&L</div></div>
+<div><div class="v">{s.get('trades',0)}</div><div class="l">Trades</div></div>
+<div><div class="v">{s.get('winners',0)}</div><div class="l">Won</div></div>
+<div><div class="v">{s.get('losers',0)}</div><div class="l">Lost</div></div>
+</div>
+<div style="font-size:0.75em;margin:6px 0;"><b style="color:#f59e0b;">Gate blocks:</b> {gate_html or 'None'}</div>
+{trades_html or '<div style="font-size:0.78em;color:#6b7280;">No trades</div>'}
+</div>"""
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Summaries</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box;}}
+body{{font-family:system-ui;background:#0a0e1a;color:#e0e0e0;padding:16px;}}
+h2{{text-align:center;color:#00d4ff;margin-bottom:12px;font-size:1.3em;}}
+.card{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:14px;margin:10px 0;}}
+.v{{font-size:1.1em;font-weight:800;}} .l{{font-size:0.65em;color:#6b7280;}}
+.pos{{color:#10b981;}} .neg{{color:#ef4444;}}
+.nav{{text-align:center;margin:10px 0;font-size:0.85em;}} a{{color:#3b82f6;text-decoration:none;}}
+</style></head><body>
+<h2>Daily Summaries</h2>
+<div class="nav"><a href="/">Token</a> | <a href="/live">Live</a> | <a href="/trades">Trades</a> | <a href="/summary">Summary</a></div>
+{cards if cards else '<div class="card"><p style="color:#6b7280;text-align:center;">No summaries yet. First summary generates at 3:35 PM.</p></div>'}
+</body></html>"""
 
 
 @app.route("/status", methods=["GET"])

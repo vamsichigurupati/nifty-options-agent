@@ -157,8 +157,17 @@ class DhanPaperTrader:
 
         return self._scan_for_signal(spot_price, current_time)
 
+    def _log_gate(self, gate_name: str, reason: str, current_time: datetime):
+        """Log why a gate blocked a trade."""
+        log_dir = Path(__file__).parent.parent / "data" / "gate_logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f"{self.version_id}_{current_time.strftime('%Y-%m-%d')}.jsonl"
+        entry = {"time": current_time.strftime("%H:%M"), "gate": gate_name, "reason": reason}
+        with open(log_file, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+
     def _scan_for_signal(self, spot_price: float, current_time: datetime):
-        """Run full gate check and generate signal."""
+        """Run full gate check and generate signal. Logs every blocked gate."""
         hour = current_time.hour
         minute = current_time.minute
         time_min = hour * 60 + minute
@@ -172,49 +181,75 @@ class DhanPaperTrader:
         if time_min < market_start or hour > 15 or (hour == 15 and minute > 15):
             return None
         if current_time.weekday() in self.PARAMS["avoid_days"]:
+            self._log_gate("avoid_day", f"Weekday {current_time.strftime('%A')} blocked", current_time)
             return None
 
         afternoon_relaxed = (time_min >= 13 * 60 + 30 and self.trades_today == 0)
         if not afternoon_relaxed and hour in self.PARAMS["avoid_hours"]:
+            self._log_gate("avoid_hour", f"Hour {hour}:00 blocked", current_time)
             return None
         if self.trades_today >= self.PARAMS["max_trades_per_day"]:
+            self._log_gate("max_trades", f"Already {self.trades_today} trades today", current_time)
             return None
         if self.last_trade_time:
-            if (current_time - self.last_trade_time).total_seconds() / 60 < self.PARAMS["cooldown_minutes"]:
+            mins_since = (current_time - self.last_trade_time).total_seconds() / 60
+            if mins_since < self.PARAMS["cooldown_minutes"]:
+                self._log_gate("cooldown", f"{mins_since:.0f}m since last trade (<{self.PARAMS['cooldown_minutes']}m)", current_time)
                 return None
 
         if len(self.spot_buffer) < 50:
+            self._log_gate("candles", f"Only {len(self.spot_buffer)} candles (<50)", current_time)
             return None
 
-        # Resample to 5-min for indicators
         spot_5m = self.spot_buffer.set_index("date").resample("5min").agg({
             "open": "first", "high": "max", "low": "min",
             "close": "last", "volume": "sum"
         }).dropna().reset_index()
 
         if len(spot_5m) < 20:
+            self._log_gate("5m_candles", f"Only {len(spot_5m)} 5-min candles (<20)", current_time)
             return None
 
-        # Run version-specific trend detection
         trend = self.detect_trend(spot_5m)
 
-        # Gates
-        if trend["direction"] == 0: return None
-        if trend["direction"] == 1 and trend["strength"] < self.PARAMS["min_trend_strength"]: return None
-        if trend["direction"] == -1 and (100 - trend["strength"]) < self.PARAMS["min_bear_strength"]: return None
-        if trend["direction"] == 1 and trend["strength"] > self.PARAMS["max_trend_strength"]: return None
-        if trend["direction"] == -1 and (100 - trend["strength"]) > self.PARAMS["max_trend_strength"]: return None
+        if trend["direction"] == 0:
+            self._log_gate("trend_neutral", f"No clear trend (strength={trend['strength']:.0f}%)", current_time)
+            return None
+        if trend["direction"] == 1 and trend["strength"] < self.PARAMS["min_trend_strength"]:
+            self._log_gate("trend_weak_bull", f"Bull too weak ({trend['strength']:.0f}% < {self.PARAMS['min_trend_strength']}%)", current_time)
+            return None
+        if trend["direction"] == -1 and (100 - trend["strength"]) < self.PARAMS["min_bear_strength"]:
+            self._log_gate("trend_weak_bear", f"Bear too weak ({100-trend['strength']:.0f}% < {self.PARAMS['min_bear_strength']}%)", current_time)
+            return None
+        if trend["direction"] == 1 and trend["strength"] > self.PARAMS["max_trend_strength"]:
+            self._log_gate("trend_exhausted", f"Bull exhausted ({trend['strength']:.0f}% > {self.PARAMS['max_trend_strength']}%)", current_time)
+            return None
+        if trend["direction"] == -1 and (100 - trend["strength"]) > self.PARAMS["max_trend_strength"]:
+            self._log_gate("trend_exhausted", f"Bear exhausted ({100-trend['strength']:.0f}% > {self.PARAMS['max_trend_strength']}%)", current_time)
+            return None
 
         target_type = "CE" if trend["direction"] == 1 else "PE"
         rsi_val = trend.get("rsi", 50)
-        if target_type == "CE" and rsi_val > self.PARAMS["max_rsi_ce"]: return None
-        if target_type == "PE" and rsi_val < 20: return None
+        if target_type == "CE" and rsi_val > self.PARAMS["max_rsi_ce"]:
+            self._log_gate("rsi_overbought", f"RSI {rsi_val:.0f} > {self.PARAMS['max_rsi_ce']} for CE", current_time)
+            return None
+        if target_type == "PE" and rsi_val < 20:
+            self._log_gate("rsi_oversold", f"RSI {rsi_val:.0f} < 20 for PE", current_time)
+            return None
         if not afternoon_relaxed:
-            if self.PARAMS["rsi_dead_zone_lo"] <= rsi_val <= self.PARAMS["rsi_dead_zone_hi"]: return None
+            if self.PARAMS["rsi_dead_zone_lo"] <= rsi_val <= self.PARAMS["rsi_dead_zone_hi"]:
+                self._log_gate("rsi_dead_zone", f"RSI {rsi_val:.0f} in dead zone ({self.PARAMS['rsi_dead_zone_lo']}-{self.PARAMS['rsi_dead_zone_hi']})", current_time)
+                return None
 
         pa = trend.get("details", {}).get("price_action", "NEUTRAL")
-        if target_type == "CE" and pa != "BULL": return None
-        if target_type == "PE" and pa != "BEAR": return None
+        if target_type == "CE" and pa != "BULL":
+            self._log_gate("price_action", f"PA={pa}, need BULL for CE", current_time)
+            return None
+        if target_type == "PE" and pa != "BEAR":
+            self._log_gate("price_action", f"PA={pa}, need BEAR for PE", current_time)
+            return None
+
+        self._log_gate("ALL_PASSED", f"Signal! {target_type} trend={trend['strength']:.0f}% RSI={rsi_val:.0f}", current_time)
 
         # ── Signal! Get real option data from Dhan ──
         try:
@@ -477,6 +512,67 @@ class DhanPaperTrader:
                 "open_trade": self.open_trade is not None}
 
 
+def _write_daily_summary(traders: dict, date_str: str):
+    """Write end-of-day summary with gate statistics."""
+    summary_dir = Path(__file__).parent.parent / "data" / "daily_summaries"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    gate_log_dir = Path(__file__).parent.parent / "data" / "gate_logs"
+
+    summaries = {}
+    for vid, trader in traders.items():
+        s = trader.get_summary()
+        today_trades = [t for t in trader.trades
+                        if t.get("status") == "CLOSED" and
+                        t.get("entry_time", "").startswith(date_str)]
+
+        # Count gate blocks from today's log
+        gate_counts = {}
+        log_file = gate_log_dir / f"{vid}_{date_str}.jsonl"
+        if log_file.exists():
+            for line in log_file.read_text().strip().split("\n"):
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    gate = entry.get("gate", "unknown")
+                    gate_counts[gate] = gate_counts.get(gate, 0) + 1
+                except Exception:
+                    pass
+
+        winners = [t for t in today_trades if (t.get("pnl") or 0) > 0]
+        losers = [t for t in today_trades if (t.get("pnl") or 0) < 0]
+
+        summaries[vid] = {
+            "version": vid,
+            "date": date_str,
+            "trades": len(today_trades),
+            "winners": len(winners),
+            "losers": len(losers),
+            "pnl": round(sum(t.get("pnl", 0) for t in today_trades), 2),
+            "capital": s["capital"],
+            "total_pnl": s["pnl"],
+            "gate_blocks": gate_counts,
+            "trades_detail": today_trades,
+        }
+
+    with open(summary_dir / f"{date_str}.json", "w") as f:
+        json.dump(summaries, f, indent=2, default=str)
+
+    logger.info(f"Daily summary written for {date_str}")
+
+
+def _write_token_alert(expired: bool):
+    """Write token status for the web dashboard."""
+    alert_file = Path(__file__).parent.parent / "data" / "token_alert.json"
+    alert_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(alert_file, "w") as f:
+        json.dump({
+            "expired": expired,
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "message": "TOKEN EXPIRED — update at /update" if expired else "Token OK",
+        }, f)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Dhan Paper Trading")
     parser.add_argument("--live", action="store_true", help="Start live paper trading")
@@ -517,23 +613,48 @@ def main():
         logger.info("Polling: 2 min (scanning) / 1 min (when trade open)")
         logger.info("Press Ctrl+C to stop.\n")
 
+        eod_summary_done = {}
+        token_alert_written = False
+
         while True:
             now = datetime.now()
+            today_str = now.strftime("%Y-%m-%d")
+
             if now.hour < 9 or (now.hour == 9 and now.minute < 15):
                 time.sleep(60); continue
-            if now.hour >= 16:
+
+            # ── #3: Daily summary at 3:35 PM ──
+            if now.hour == 15 and now.minute >= 35 and today_str not in eod_summary_done:
+                _write_daily_summary(traders, today_str)
+                eod_summary_done[today_str] = True
                 for vid, trader in traders.items():
                     s = trader.get_summary()
                     logger.info(f"[{vid}] EOD: P&L={s['pnl']:+,.0f} Trades={s['trades']} WR={s['win_rate']}%")
+
+            if now.hour >= 16:
                 time.sleep(3600); continue
 
             # Fetch spot ONCE, share across all versions
             try:
                 spot_price = broker.get_spot_price("NIFTY")
                 logger.info(f"NIFTY: {spot_price:.2f}")
+                token_alert_written = False  # reset on success
             except Exception as e:
+                error_msg = str(e)
                 logger.error(f"Spot fetch failed: {e}")
+
+                # ── #4: Token expiry detection ──
+                if "808" in error_msg or "Authentication" in error_msg or "Invalid Token" in error_msg:
+                    if not token_alert_written:
+                        _write_token_alert(True)
+                        token_alert_written = True
+                        logger.error("TOKEN EXPIRED! Update at http://SERVER:8080/")
+
                 time.sleep(60); continue
+
+            # Clear token alert on success
+            if not token_alert_written:
+                _write_token_alert(False)
 
             for vid, trader in traders.items():
                 try:
