@@ -74,6 +74,44 @@ class DhanPaperTrader:
         self.last_trade_time = None
         self.spot_buffer = pd.DataFrame()
         self._load_state()
+        self._preload_candles()
+
+    def _preload_candles(self):
+        """Load last 5 days of 5-min candles from Dhan on startup.
+        This way the system is ready to trade immediately, no 4-hour wait."""
+        try:
+            today = datetime.now().date()
+            from_date = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+            to_date = today.strftime("%Y-%m-%d")
+
+            r = self.broker.dhan.intraday_minute_data(
+                "13", "IDX_I", "INDEX", from_date, to_date, 5
+            )
+
+            if r.get("status") == "success" and r.get("data") and "open" in r["data"]:
+                d = r["data"]
+                IST_OFFSET = pd.Timedelta(hours=5, minutes=30)
+                rows = []
+                for i in range(len(d["open"])):
+                    dt = pd.to_datetime(d["timestamp"][i], unit="s") + IST_OFFSET
+                    rows.append({
+                        "date": dt, "open": d["open"][i], "high": d["high"][i],
+                        "low": d["low"][i], "close": d["close"][i],
+                        "volume": d["volume"][i],
+                    })
+
+                df = pd.DataFrame(rows)
+                df = df[(df["date"].dt.hour >= 9) & (df["date"].dt.hour < 16)]
+                df = df[~((df["date"].dt.hour == 9) & (df["date"].dt.minute < 15))]
+                df = df.drop_duplicates(subset="date").sort_values("date").reset_index(drop=True)
+
+                self.spot_buffer = df
+                logger.info(f"[{self.version_id}] Preloaded {len(df)} candles "
+                            f"({df['date'].dt.date.nunique()} days). Ready to trade.")
+            else:
+                logger.warning(f"[{self.version_id}] Preload failed: {r.get('data', {})}")
+        except Exception as e:
+            logger.error(f"[{self.version_id}] Preload error: {e}")
 
     PARAMS = {
         "min_trend_strength": 60, "min_bear_strength": 45,
