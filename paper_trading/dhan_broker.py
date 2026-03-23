@@ -38,12 +38,12 @@ class DhanBroker:
     def get_spot_price(self, underlying: str = "NIFTY") -> float:
         """Get current spot price of NIFTY/BANKNIFTY."""
         sec_id = NIFTY_SECURITY_ID if underlying == "NIFTY" else BANKNIFTY_SECURITY_ID
-        data = self.dhan.ticker_data(
-            security_id=sec_id,
-            exchange_segment=self.dhan.INDEX
-        )
+        seg = "IDX_I"
+        data = self.dhan.ticker_data(securities={seg: [int(sec_id)]})
         if data and data.get("status") == "success":
-            return data["data"]["LTP"]
+            inner = data.get("data", {}).get("data", {})
+            if isinstance(inner, dict) and seg in inner:
+                return inner[seg][sec_id]["last_price"]
         raise RuntimeError(f"Failed to get spot price: {data}")
 
     def get_intraday_data(self, security_id: str, exchange: str,

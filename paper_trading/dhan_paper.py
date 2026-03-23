@@ -85,18 +85,20 @@ class DhanPaperTrader:
         "breakeven_trigger_pct": 20, "max_loss_per_trade": 2000,
     }
 
-    def tick(self, current_time: datetime = None):
+    def tick(self, current_time: datetime = None, shared_spot: float = None):
         """Called every 2 minutes during market hours."""
         if current_time is None:
             current_time = datetime.now()
 
-        # Fetch latest spot data from Dhan
-        try:
-            spot_price = self.broker.get_spot_price("NIFTY")
-            logger.debug(f"[{self.version_id}] NIFTY spot: {spot_price:.2f}")
-        except Exception as e:
-            logger.error(f"[{self.version_id}] Spot fetch failed: {e}")
-            return None
+        # Use shared spot price (fetched once in main loop)
+        if shared_spot:
+            spot_price = shared_spot
+        else:
+            try:
+                spot_price = self.broker.get_spot_price("NIFTY")
+            except Exception as e:
+                logger.error(f"[{self.version_id}] Spot fetch failed: {e}")
+                return None
 
         # Add to buffer
         new_row = pd.DataFrame([{
@@ -383,7 +385,7 @@ def main():
             detect_fn = cfg["detect_trend"]()
             traders[vid] = DhanPaperTrader(vid, detect_fn, broker, args.capital)
 
-        logger.info(f"Starting Dhan paper trading — V1 + V2, Rs.{args.capital:,.0f} each")
+        logger.info(f"Starting Dhan paper trading — V1 + V3, Rs.{args.capital:,.0f} each")
         logger.info("Polling every 2 minutes. Press Ctrl+C to stop.\n")
 
         while True:
@@ -391,15 +393,22 @@ def main():
             if now.hour < 9 or (now.hour == 9 and now.minute < 15):
                 time.sleep(60); continue
             if now.hour >= 16:
-                # Print EOD summary
                 for vid, trader in traders.items():
                     s = trader.get_summary()
                     logger.info(f"[{vid}] EOD: P&L={s['pnl']:+,.0f} Trades={s['trades']} WR={s['win_rate']}%")
                 time.sleep(3600); continue
 
+            # Fetch spot ONCE, share across all versions
+            try:
+                spot_price = broker.get_spot_price("NIFTY")
+                logger.info(f"NIFTY: {spot_price:.2f}")
+            except Exception as e:
+                logger.error(f"Spot fetch failed: {e}")
+                time.sleep(120); continue
+
             for vid, trader in traders.items():
                 try:
-                    trader.tick(now)
+                    trader.tick(now, shared_spot=spot_price)
                 except Exception as e:
                     logger.error(f"[{vid}] Error: {e}")
 
@@ -407,7 +416,7 @@ def main():
             for vid, trader in traders.items():
                 s = trader.get_summary()
                 status = "OPEN" if s["open_trade"] else "idle"
-                logger.info(f"  [{cfg['name'][:8]}] P&L={s['pnl']:+,.0f} | {s['trades']} trades | {status}")
+                logger.info(f"  [{vid[:6]}] P&L={s['pnl']:+,.0f} | {s['trades']} trades | {status}")
 
             time.sleep(120)  # 2 minutes
 
