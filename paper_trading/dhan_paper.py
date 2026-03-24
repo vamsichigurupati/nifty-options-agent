@@ -1,27 +1,9 @@
 #!/usr/bin/env python3
 """
-Paper trading with Dhan — real market data, virtual orders.
+Paper trading with Dhan — uses the ACTUAL backtest engine for signal generation.
 
-Setup:
-  1. Create free account at https://dhanhq.co
-  2. Go to API section, generate access token
-  3. Add to .env:
-     DHAN_CLIENT_ID=your_client_id
-     DHAN_ACCESS_TOKEN=your_access_token
-  4. Enable "Virtual Trading" in Dhan app settings
-
-Usage:
-  # Start live paper trading (polls every 2 min):
-  python -m paper_trading.dhan_paper --live
-
-  # Check status:
-  python -m paper_trading.dhan_paper --status
-
-  # Generate dashboard:
-  python -m paper_trading.dhan_paper --dashboard
-
-  # Reset:
-  python -m paper_trading.dhan_paper --reset
+Same code that produced +35K in backtesting now runs live.
+Dhan API provides real spot data. Option premiums are derived (same as backtest).
 """
 from __future__ import annotations
 
@@ -35,6 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -43,6 +26,8 @@ load_dotenv()
 
 from paper_trading.versions import VERSION_CONFIG
 from paper_trading.dhan_broker import DhanBroker
+from backtest.engine import BacktestEngine, BacktestResult
+from backtest.real_data import derive_option_chain
 from strategy.indicators import atr, rsi
 
 logging.basicConfig(
@@ -55,11 +40,9 @@ logger = logging.getLogger(__name__)
 TRADES_DIR = Path("data/dhan_paper_trades")
 TRADES_DIR.mkdir(parents=True, exist_ok=True)
 
-CAPITAL_PER_VERSION = 50_000
-
 
 class DhanPaperTrader:
-    """Paper trader that uses Dhan API for real data + virtual orders."""
+    """Paper trader that uses the REAL BacktestEngine for signal + exit logic."""
 
     def __init__(self, version_id: str, detect_trend_fn, broker: DhanBroker,
                  capital: float = 50_000):
@@ -72,14 +55,14 @@ class DhanPaperTrader:
         self.open_trade = None
         self.trades_today = 0
         self.last_trade_time = None
-        self.spot_buffer = pd.DataFrame()
         self._last_buffer_refresh = None
+        self._spot_buffer = pd.DataFrame()
+        self._engine = None
         self._load_state()
-        self._preload_candles()
+        self._refresh_data()
 
-    def _preload_candles(self):
-        """Load last 5 days of 5-min candles from Dhan on startup.
-        This way the system is ready to trade immediately, no 4-hour wait."""
+    def _refresh_data(self):
+        """Fetch real 5-min OHLC from Dhan and rebuild BacktestEngine."""
         try:
             today = datetime.now().date()
             from_date = (today - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -105,74 +88,159 @@ class DhanPaperTrader:
                 df = df[(df["date"].dt.hour >= 9) & (df["date"].dt.hour < 16)]
                 df = df[~((df["date"].dt.hour == 9) & (df["date"].dt.minute < 15))]
                 df = df.drop_duplicates(subset="date").sort_values("date").reset_index(drop=True)
+                self._spot_buffer = df
 
-                self.spot_buffer = df
-                logger.info(f"[{self.version_id}] Preloaded {len(df)} candles "
-                            f"({df['date'].dt.date.nunique()} days). Ready to trade.")
+                # Derive option chain from real spot (same as backtest)
+                options = derive_option_chain(df, "NIFTY")
+
+                # Create BacktestEngine with this data — uses EXACT same logic
+                # Override detect_trend with our version-specific one
+                from strategy import indicators as ind_module
+                original_detect = ind_module.detect_trend
+                ind_module.detect_trend = self.detect_trend
+
+                self._engine = BacktestEngine(
+                    spot_data=df, options_data=options,
+                    underlying="NIFTY", initial_capital=self.capital,
+                )
+                # Restore original
+                ind_module.detect_trend = original_detect
+
+                logger.info(f"[{self.version_id}] Loaded {len(df)} candles "
+                            f"({df['date'].dt.date.nunique()} days). Engine ready.")
             else:
-                logger.warning(f"[{self.version_id}] Preload failed: {r.get('data', {})}")
+                logger.warning(f"[{self.version_id}] Data refresh failed: {r.get('data', {})}")
         except Exception as e:
-            logger.error(f"[{self.version_id}] Preload error: {e}")
-
-    PARAMS = {
-        "min_trend_strength": 60, "min_bear_strength": 45,
-        "max_trend_strength": 92, "max_rsi_ce": 75,
-        "rsi_dead_zone_lo": 48, "rsi_dead_zone_hi": 57,
-        "max_trades_per_day": 2, "cooldown_minutes": 30,
-        "skip_first_minutes": 5, "avoid_days": [0, 4], "avoid_hours": [9, 12],
-        "min_sl_pct": 0.15, "atr_sl_multiplier": 1.5, "rr_ratio": 2.0,
-        "breakeven_trigger_pct": 20, "max_loss_per_trade": 2000,
-    }
+            logger.error(f"[{self.version_id}] Refresh error: {e}")
 
     def tick(self, current_time: datetime = None, shared_spot: float = None):
-        """Called every 2 minutes during market hours."""
+        """Run one step of the backtest engine on accumulated data."""
         if current_time is None:
             current_time = datetime.now()
 
-        # Use shared spot price (fetched once in main loop)
-        if shared_spot:
-            spot_price = shared_spot
-        else:
-            try:
-                spot_price = self.broker.get_spot_price("NIFTY")
-            except Exception as e:
-                logger.error(f"[{self.version_id}] Spot fetch failed: {e}")
-                return None
+        if not shared_spot:
+            return None
 
-        # Refresh buffer from Dhan's real OHLC data every 5 minutes
-        # This gives proper high/low/open instead of flat spot ticks
+        # Refresh data from Dhan every 5 minutes
         needs_refresh = (
             self._last_buffer_refresh is None or
             (current_time - self._last_buffer_refresh).total_seconds() >= 300
         )
         if needs_refresh:
-            self._preload_candles()
+            self._refresh_data()
             self._last_buffer_refresh = current_time
 
-        # Append current tick as latest data point (will be overwritten on next refresh)
-        if not self.spot_buffer.empty:
-            last_date = self.spot_buffer.iloc[-1]["date"]
-            if (current_time - last_date).total_seconds() >= 60:
-                new_row = pd.DataFrame([{
-                    "date": current_time, "open": spot_price, "high": spot_price,
-                    "low": spot_price, "close": spot_price, "volume": 100000,
-                }])
-                self.spot_buffer = pd.concat([self.spot_buffer, new_row], ignore_index=True)
+        if self._engine is None or self._spot_buffer.empty:
+            return None
 
-        # Keep last 500 candles
-        if len(self.spot_buffer) > 500:
-            self.spot_buffer = self.spot_buffer.iloc[-500:]
+        # Find the latest candle index in the engine's data
+        spot = self._engine.spot
+        if len(spot) < 50:
+            return None
 
-        # Write live status every tick
-        self._write_live_status(spot_price, current_time)
+        # Use the last candle as current
+        i = len(spot) - 1
+        candle_time = spot.iloc[i]["date"]
 
-        if self.open_trade:
-            return self._monitor_position(spot_price, current_time)
+        # Reset daily counter
+        if self.last_trade_time and self.last_trade_time.date() != current_time.date():
+            self.trades_today = 0
+            self._engine._trades_today = 0
 
-        return self._scan_for_signal(spot_price, current_time)
+        # Sync engine state with our state
+        self._engine.capital = self.capital
+        self._engine._trades_today = self.trades_today
+
+        # Run engine's monitoring on open trades
+        if self._engine._open_trades:
+            self._engine._monitor_positions(candle_time, shared_spot)
+            # Check if engine closed any trades
+            self._sync_closed_trades()
+
+        # Run engine's scan if no open trade
+        if not self._engine._open_trades and not self.open_trade:
+            # Check daily limits
+            if self.trades_today >= 2:
+                self._log_gate("max_trades", f"Already {self.trades_today} trades today", current_time)
+                return None
+
+            # Cooldown check
+            if self.last_trade_time:
+                mins_since = (current_time - self.last_trade_time).total_seconds() / 60
+                if mins_since < 30:
+                    return None
+
+            # Let the engine scan — uses exact same gates, indicators, SL logic
+            old_trade_count = len(self._engine._closed_trades)
+            old_open_count = len(self._engine._open_trades)
+
+            self._engine._scan_and_signal(i, candle_time, shared_spot)
+
+            # Check if engine opened a new trade
+            if len(self._engine._open_trades) > old_open_count:
+                trade = self._engine._open_trades[-1]
+                self.open_trade = {
+                    "id": len(self.trades) + 1,
+                    "version": self.version_id,
+                    "symbol": trade.tradingsymbol,
+                    "type": "CE" if "CE" in trade.tradingsymbol else "PE",
+                    "entry_price": round(trade.entry_price, 2),
+                    "stop_loss": round(trade.stop_loss, 2),
+                    "target": round(trade.target, 2),
+                    "quantity": trade.quantity,
+                    "entry_time": current_time.isoformat(),
+                    "spot_at_entry": round(shared_spot, 2),
+                    "trend_strength": trade.trend_strength,
+                    "rsi": trade.context.get("trend", {}).get("rsi", 0),
+                    "indicators": trade.context.get("trend", {}).get("details", {}),
+                    "status": "OPEN",
+                    "exit_price": None, "exit_time": None,
+                    "exit_reason": None, "pnl": None,
+                }
+                self.trades_today += 1
+                self.last_trade_time = current_time
+                self._save_state()
+
+                logger.info(f"[{self.version_id}] BUY {trade.tradingsymbol} "
+                             f"@ {trade.entry_price:.2f} SL={trade.stop_loss:.2f} "
+                             f"TGT={trade.target:.2f} Qty={trade.quantity} "
+                             f"Trend={trade.trend_strength:.0f}%")
+                return self.open_trade
+
+        # Write live status
+        self._write_live_status(shared_spot, current_time)
+        return None
+
+    def _sync_closed_trades(self):
+        """Check if the backtest engine closed our open trade."""
+        if not self.open_trade:
+            return
+
+        # Engine closed trades go to _closed_trades
+        for trade in self._engine._closed_trades:
+            # Match by tradingsymbol
+            if (self.open_trade and
+                trade.tradingsymbol == self.open_trade["symbol"] and
+                trade.status == "CLOSED"):
+
+                self.open_trade["exit_price"] = round(trade.exit_price, 2)
+                self.open_trade["exit_time"] = datetime.now().isoformat()
+                self.open_trade["exit_reason"] = trade.exit_reason
+                self.open_trade["pnl"] = round(trade.net_pnl, 2)
+                self.open_trade["status"] = "CLOSED"
+                self.capital += trade.net_pnl
+
+                logger.info(f"[{self.version_id}] SELL {trade.tradingsymbol} "
+                             f"@ {trade.exit_price:.2f} {trade.exit_reason} "
+                             f"P&L={trade.net_pnl:+,.0f} Capital={self.capital:,.0f}")
+
+                self.trades.append(self.open_trade)
+                self.open_trade = None
+                self._engine._closed_trades.remove(trade)
+                self._save_state()
+                break
 
     def _log_gate(self, gate_name: str, reason: str, current_time: datetime):
-        """Log why a gate blocked a trade."""
         log_dir = Path(__file__).parent.parent / "data" / "gate_logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / f"{self.version_id}_{current_time.strftime('%Y-%m-%d')}.jsonl"
@@ -180,328 +248,65 @@ class DhanPaperTrader:
         with open(log_file, "a") as f:
             f.write(json.dumps(entry) + "\n")
 
-    def _scan_for_signal(self, spot_price: float, current_time: datetime):
-        """Run full gate check and generate signal. Logs every blocked gate."""
-        hour = current_time.hour
-        minute = current_time.minute
-        time_min = hour * 60 + minute
-
-        # Daily reset
-        if self.last_trade_time and self.last_trade_time.date() != current_time.date():
-            self.trades_today = 0
-
-        # Market hours
-        market_start = 9 * 60 + 15 + self.PARAMS["skip_first_minutes"]
-        if time_min < market_start or hour > 15 or (hour == 15 and minute > 15):
-            return None
-        if current_time.weekday() in self.PARAMS["avoid_days"]:
-            self._log_gate("avoid_day", f"Weekday {current_time.strftime('%A')} blocked", current_time)
-            return None
-
-        afternoon_relaxed = (time_min >= 13 * 60 + 30 and self.trades_today == 0)
-        if not afternoon_relaxed and hour in self.PARAMS["avoid_hours"]:
-            self._log_gate("avoid_hour", f"Hour {hour}:00 blocked", current_time)
-            return None
-        if self.trades_today >= self.PARAMS["max_trades_per_day"]:
-            self._log_gate("max_trades", f"Already {self.trades_today} trades today", current_time)
-            return None
-        if self.last_trade_time:
-            mins_since = (current_time - self.last_trade_time).total_seconds() / 60
-            if mins_since < self.PARAMS["cooldown_minutes"]:
-                self._log_gate("cooldown", f"{mins_since:.0f}m since last trade (<{self.PARAMS['cooldown_minutes']}m)", current_time)
-                return None
-
-        if len(self.spot_buffer) < 50:
-            self._log_gate("candles", f"Only {len(self.spot_buffer)} candles (<50)", current_time)
-            return None
-
-        spot_5m = self.spot_buffer.set_index("date").resample("5min").agg({
-            "open": "first", "high": "max", "low": "min",
-            "close": "last", "volume": "sum"
-        }).dropna().reset_index()
-
-        if len(spot_5m) < 20:
-            self._log_gate("5m_candles", f"Only {len(spot_5m)} 5-min candles (<20)", current_time)
-            return None
-
-        trend = self.detect_trend(spot_5m)
-
-        if trend["direction"] == 0:
-            self._log_gate("trend_neutral", f"No clear trend (strength={trend['strength']:.0f}%)", current_time)
-            return None
-        if trend["direction"] == 1 and trend["strength"] < self.PARAMS["min_trend_strength"]:
-            self._log_gate("trend_weak_bull", f"Bull too weak ({trend['strength']:.0f}% < {self.PARAMS['min_trend_strength']}%)", current_time)
-            return None
-        if trend["direction"] == -1 and (100 - trend["strength"]) < self.PARAMS["min_bear_strength"]:
-            self._log_gate("trend_weak_bear", f"Bear too weak ({100-trend['strength']:.0f}% < {self.PARAMS['min_bear_strength']}%)", current_time)
-            return None
-        if trend["direction"] == 1 and trend["strength"] > self.PARAMS["max_trend_strength"]:
-            self._log_gate("trend_exhausted", f"Bull exhausted ({trend['strength']:.0f}% > {self.PARAMS['max_trend_strength']}%)", current_time)
-            return None
-        if trend["direction"] == -1 and (100 - trend["strength"]) > self.PARAMS["max_trend_strength"]:
-            self._log_gate("trend_exhausted", f"Bear exhausted ({100-trend['strength']:.0f}% > {self.PARAMS['max_trend_strength']}%)", current_time)
-            return None
-
-        target_type = "CE" if trend["direction"] == 1 else "PE"
-        rsi_val = trend.get("rsi", 50)
-        if target_type == "CE" and rsi_val > self.PARAMS["max_rsi_ce"]:
-            self._log_gate("rsi_overbought", f"RSI {rsi_val:.0f} > {self.PARAMS['max_rsi_ce']} for CE", current_time)
-            return None
-        if target_type == "PE" and rsi_val < 20:
-            self._log_gate("rsi_oversold", f"RSI {rsi_val:.0f} < 20 for PE", current_time)
-            return None
-        if not afternoon_relaxed:
-            if self.PARAMS["rsi_dead_zone_lo"] <= rsi_val <= self.PARAMS["rsi_dead_zone_hi"]:
-                self._log_gate("rsi_dead_zone", f"RSI {rsi_val:.0f} in dead zone ({self.PARAMS['rsi_dead_zone_lo']}-{self.PARAMS['rsi_dead_zone_hi']})", current_time)
-                return None
-
-        pa = trend.get("details", {}).get("price_action", "NEUTRAL")
-        if target_type == "CE" and pa != "BULL":
-            self._log_gate("price_action", f"PA={pa}, need BULL for CE", current_time)
-            return None
-        if target_type == "PE" and pa != "BEAR":
-            self._log_gate("price_action", f"PA={pa}, need BEAR for PE", current_time)
-            return None
-
-        self._log_gate("ALL_PASSED", f"Signal! {target_type} trend={trend['strength']:.0f}% RSI={rsi_val:.0f}", current_time)
-
-        # ── Signal! Get real option data from Dhan ──
-        try:
-            chain = self.broker.get_option_chain("NIFTY")
-        except Exception as e:
-            logger.error(f"Option chain fetch failed: {e}")
-            chain = []
-
-        # Find best option near ATM
-        strike_step = 50
-        atm = round(spot_price / strike_step) * strike_step
-        target_strike = atm + strike_step if target_type == "CE" else atm - strike_step
-
-        # Try to get real LTP from chain
-        premium = None
-        security_id = ""
-        if chain:
-            for opt in chain:
-                if (opt.get("strikePrice") == target_strike and
-                    opt.get("optionType") == target_type):
-                    premium = opt.get("LTP", opt.get("lastPrice", 0))
-                    security_id = str(opt.get("securityId", ""))
-                    break
-
-        if not premium or premium < 50:
-            # Fallback: estimate premium
-            premium = max(50, abs(spot_price - target_strike) * 0.3 + 80)
-
-        # SL / Target
-        atr_val = atr(spot_5m, 14).iloc[-1] if len(spot_5m) >= 15 else 30
-        if pd.isna(atr_val) or atr_val <= 0:
-            atr_val = 30  # fallback to safe default
-        sl_points = atr_val * self.PARAMS["atr_sl_multiplier"] * 0.4
-        sl = round(premium - sl_points, 2)
-        # Floor: SL never tighter than min_sl_pct of premium
-        min_sl = round(premium * (1 - self.PARAMS["min_sl_pct"]), 2)
-        sl = min(sl, min_sl)  # pick the LOWER (wider) SL
-        # Cap: SL never wider than 50% loss
-        sl = max(sl, premium * 0.50)
-        risk = premium - sl
-        if risk < premium * 0.05:  # minimum 5% risk (not zero)
-            sl = round(premium * 0.85, 2)  # force 15% SL
-            risk = premium - sl
-        if risk <= 0: return None
-        target = round(premium + risk * self.PARAMS["rr_ratio"], 2)
-        qty = max(int(self.PARAMS["max_loss_per_trade"] / risk // 75) * 75, 75)
-
-        symbol = f"NIFTY{int(target_strike)}{target_type}"
-
-        # Place virtual order on Dhan (if security_id available)
-        order_id = ""
-        if security_id:
-            try:
-                result = self.broker.place_virtual_order(
-                    security_id=security_id,
-                    transaction_type="BUY",
-                    quantity=qty,
-                    order_type="MARKET",
-                )
-                order_id = result.get("data", {}).get("orderId", "")
-            except Exception as e:
-                logger.warning(f"Dhan virtual order failed (continuing as paper): {e}")
-
-        trade = {
-            "id": len(self.trades) + 1,
-            "version": self.version_id,
-            "symbol": symbol,
-            "security_id": security_id,
-            "type": target_type,
-            "entry_price": round(premium, 2),
-            "stop_loss": round(sl, 2),
-            "target": round(target, 2),
-            "quantity": qty,
-            "entry_time": current_time.isoformat(),
-            "spot_at_entry": round(spot_price, 2),
-            "trend_strength": trend["strength"],
-            "rsi": rsi_val,
-            "indicators": trend.get("details", {}),
-            "order_id": order_id,
-            "status": "OPEN",
-            "exit_price": None, "exit_time": None, "exit_reason": None, "pnl": None,
-        }
-
-        self.open_trade = trade
-        self.trades_today += 1
-        self.last_trade_time = current_time
-        self._save_state()
-
-        logger.info(f"[{self.version_id}] BUY {symbol} @ {premium:.2f} "
-                     f"SL={sl:.2f} TGT={target:.2f} Qty={qty} "
-                     f"Trend={trend['strength']:.0f}% Dhan={order_id or 'paper'}")
-        return trade
-
-    def _monitor_position(self, spot_price: float, current_time: datetime):
-        """Monitor open position using real spot data."""
-        t = self.open_trade
-        entry_spot = t["spot_at_entry"]
-        delta = 0.4 if t["type"] == "CE" else -0.4
-        est_premium = t["entry_price"] + (spot_price - entry_spot) * delta
-        est_premium = max(est_premium, 0.5)
-
-        # Try to get real option LTP
-        if t.get("security_id"):
-            try:
-                quote = self.broker.get_option_ltp(t["security_id"])
-                if quote and quote.get("LTP"):
-                    est_premium = quote["LTP"]
-            except Exception:
-                pass  # fall back to estimate
-
-        if est_premium <= t["stop_loss"]:
-            self._close_trade(t["stop_loss"], current_time, "SL_HIT")
-        elif est_premium >= t["target"]:
-            self._close_trade(t["target"], current_time, "TARGET_HIT")
-        elif current_time.hour == 15 and current_time.minute >= 15:
-            self._close_trade(est_premium, current_time, "EOD_SQUAREOFF")
-        else:
-            # Trailing SL
-            total_move = t["target"] - t["entry_price"]
-            current_move = est_premium - t["entry_price"]
-            if total_move > 0:
-                move_pct = current_move / total_move * 100
-                if move_pct >= self.PARAMS["breakeven_trigger_pct"]:
-                    t["stop_loss"] = max(t["stop_loss"], t["entry_price"])
-
-    def _close_trade(self, exit_price, exit_time, reason):
-        t = self.open_trade
-        t["exit_price"] = round(exit_price, 2)
-        t["exit_time"] = exit_time.isoformat()
-        t["exit_reason"] = reason
-        t["pnl"] = round((exit_price - t["entry_price"]) * t["quantity"], 2)
-        t["status"] = "CLOSED"
-        self.capital += t["pnl"]
-
-        # Place exit order on Dhan
-        if t.get("security_id"):
-            try:
-                self.broker.place_virtual_order(
-                    security_id=t["security_id"],
-                    transaction_type="SELL",
-                    quantity=t["quantity"],
-                    order_type="MARKET",
-                )
-            except Exception:
-                pass
-
-        self.trades.append(t)
-        self.open_trade = None
-        self._save_state()
-        logger.info(f"[{self.version_id}] SELL {t['symbol']} @ {exit_price:.2f} "
-                     f"{reason} P&L={t['pnl']:+,.0f} Capital={self.capital:,.0f}")
-
     def _write_live_status(self, spot_price: float, current_time: datetime):
-        """Write agent's current thinking to a JSON file for the web dashboard."""
         try:
             status = {
                 "version": self.version_id,
                 "time": current_time.strftime("%H:%M:%S"),
                 "spot": round(spot_price, 2),
-                "candles": len(self.spot_buffer),
+                "candles": len(self._spot_buffer),
                 "trades_today": self.trades_today,
                 "capital": round(self.capital, 2),
                 "pnl": round(self.capital - self.initial_capital, 2),
+                "engine": "BacktestEngine" if self._engine else "None",
             }
 
-            # Run trend detection if enough candles
-            if len(self.spot_buffer) >= 50:
-                spot_5m = self.spot_buffer.set_index("date").resample("5min").agg({
-                    "open": "first", "high": "max", "low": "min",
-                    "close": "last", "volume": "sum"
-                }).dropna().reset_index()
+            if self._engine and len(self._engine.spot) >= 50:
+                trend = self._engine._get_trend(len(self._engine.spot) - 1)
+                direction = "BULLISH" if trend["direction"] == 1 else (
+                    "BEARISH" if trend["direction"] == -1 else "NEUTRAL")
+                status["trend"] = direction
+                status["trend_strength"] = trend.get("strength", 0)
+                status["rsi"] = trend.get("rsi", 0)
+                status["indicators"] = trend.get("details", {})
 
-                if len(spot_5m) >= 20:
-                    trend = self.detect_trend(spot_5m)
-                    direction = "BULLISH" if trend["direction"] == 1 else (
-                        "BEARISH" if trend["direction"] == -1 else "NEUTRAL")
-                    status["trend"] = direction
-                    status["trend_strength"] = trend.get("strength", 0)
-                    status["rsi"] = trend.get("rsi", 0)
-                    status["indicators"] = trend.get("details", {})
+                # Decision reason
+                details = trend.get("details", {})
+                pa = details.get("price_action", "NEUTRAL")
+                rsi_val = trend.get("rsi", 50)
+                target_type = "CE" if trend["direction"] == 1 else "PE"
 
-                    # What the agent decided
-                    reasons = []
-                    if trend["direction"] == 0:
-                        reasons.append("No clear trend — sitting out")
-                    elif trend["strength"] > self.PARAMS["max_trend_strength"]:
-                        reasons.append(f"Trend exhausted ({trend['strength']:.0f}%) — too late to enter")
-                    else:
-                        rsi_val = trend.get("rsi", 50)
-                        target_type = "CE" if trend["direction"] == 1 else "PE"
-
-                        if target_type == "CE" and rsi_val > self.PARAMS["max_rsi_ce"]:
-                            reasons.append(f"RSI too high ({rsi_val:.0f}) for CE — overbought")
-                        elif target_type == "PE" and rsi_val < 20:
-                            reasons.append(f"RSI too low ({rsi_val:.0f}) for PE — oversold")
-                        elif self.PARAMS["rsi_dead_zone_lo"] <= rsi_val <= self.PARAMS["rsi_dead_zone_hi"]:
-                            reasons.append(f"RSI in dead zone ({rsi_val:.0f}) — no conviction")
-                        else:
-                            pa = trend.get("details", {}).get("price_action", "NEUTRAL")
-                            if target_type == "CE" and pa != "BULL":
-                                reasons.append(f"Price action is {pa}, not BULL — waiting for confirmation")
-                            elif target_type == "PE" and pa != "BEAR":
-                                reasons.append(f"Price action is {pa}, not BEAR — waiting for confirmation")
-                            elif self.trades_today >= self.PARAMS["max_trades_per_day"]:
-                                reasons.append("Max trades for today reached")
-                            elif self.open_trade:
-                                reasons.append(f"Already in a trade: {self.open_trade.get('symbol', '')}")
-                            else:
-                                reasons.append(f"Looking for {target_type} entry — all gates passing")
-
-                    status["decision"] = " | ".join(reasons) if reasons else "Scanning..."
+                if trend["direction"] == 0:
+                    status["decision"] = "No clear trend — sitting out"
+                elif trend["strength"] > 92 or (trend["direction"] == -1 and (100 - trend["strength"]) > 92):
+                    status["decision"] = f"Trend exhausted ({trend['strength']:.0f}%)"
+                elif target_type == "CE" and pa != "BULL":
+                    status["decision"] = f"Price action {pa}, need BULL for CE"
+                elif target_type == "PE" and pa != "BEAR":
+                    status["decision"] = f"Price action {pa}, need BEAR for PE"
+                elif self.trades_today >= 2:
+                    status["decision"] = "Max trades for today"
+                elif self.open_trade:
+                    status["decision"] = f"In trade: {self.open_trade['symbol']}"
                 else:
-                    status["decision"] = f"Building 5-min candles ({len(spot_5m)}/20 needed)"
-            else:
-                status["decision"] = f"Accumulating candles ({len(self.spot_buffer)}/50 needed)"
+                    status["decision"] = f"Looking for {target_type} — gates passing"
 
-            # Open trade info
             if self.open_trade:
                 t = self.open_trade
                 delta = 0.4 if t["type"] == "CE" else -0.4
                 est_pnl = (spot_price - t["spot_at_entry"]) * delta * t["quantity"]
                 status["open_trade"] = {
-                    "symbol": t["symbol"],
-                    "type": t["type"],
-                    "entry": t["entry_price"],
-                    "sl": t["stop_loss"],
-                    "target": t["target"],
-                    "est_pnl": round(est_pnl, 0),
+                    "symbol": t["symbol"], "type": t["type"],
+                    "entry": t["entry_price"], "sl": t["stop_loss"],
+                    "target": t["target"], "est_pnl": round(est_pnl, 0),
                 }
 
-            # Write to file
             live_dir = Path(__file__).parent.parent / "data" / "live_status"
             live_dir.mkdir(parents=True, exist_ok=True)
             with open(live_dir / f"{self.version_id}.json", "w") as f:
                 json.dump(status, f, indent=2, default=str)
-
         except Exception as e:
-            logger.debug(f"[{self.version_id}] Live status write error: {e}")
+            logger.debug(f"[{self.version_id}] Live status error: {e}")
 
     def _save_state(self):
         state = {"version_id": self.version_id, "capital": self.capital,
@@ -536,56 +341,40 @@ class DhanPaperTrader:
 
 
 def _write_daily_summary(traders: dict, date_str: str):
-    """Write end-of-day summary with gate statistics."""
     summary_dir = Path(__file__).parent.parent / "data" / "daily_summaries"
     summary_dir.mkdir(parents=True, exist_ok=True)
     gate_log_dir = Path(__file__).parent.parent / "data" / "gate_logs"
-
     summaries = {}
     for vid, trader in traders.items():
         s = trader.get_summary()
         today_trades = [t for t in trader.trades
                         if t.get("status") == "CLOSED" and
                         t.get("entry_time", "").startswith(date_str)]
-
-        # Count gate blocks from today's log
         gate_counts = {}
         log_file = gate_log_dir / f"{vid}_{date_str}.jsonl"
         if log_file.exists():
             for line in log_file.read_text().strip().split("\n"):
-                if not line:
-                    continue
+                if not line: continue
                 try:
                     entry = json.loads(line)
                     gate = entry.get("gate", "unknown")
                     gate_counts[gate] = gate_counts.get(gate, 0) + 1
-                except Exception:
-                    pass
-
+                except Exception: pass
         winners = [t for t in today_trades if (t.get("pnl") or 0) > 0]
         losers = [t for t in today_trades if (t.get("pnl") or 0) < 0]
-
         summaries[vid] = {
-            "version": vid,
-            "date": date_str,
-            "trades": len(today_trades),
-            "winners": len(winners),
-            "losers": len(losers),
+            "version": vid, "date": date_str, "trades": len(today_trades),
+            "winners": len(winners), "losers": len(losers),
             "pnl": round(sum(t.get("pnl", 0) for t in today_trades), 2),
-            "capital": s["capital"],
-            "total_pnl": s["pnl"],
-            "gate_blocks": gate_counts,
-            "trades_detail": today_trades,
+            "capital": s["capital"], "total_pnl": s["pnl"],
+            "gate_blocks": gate_counts, "trades_detail": today_trades,
         }
-
     with open(summary_dir / f"{date_str}.json", "w") as f:
         json.dump(summaries, f, indent=2, default=str)
-
     logger.info(f"Daily summary written for {date_str}")
 
 
 def _write_token_alert(expired: bool):
-    """Write token status for the web dashboard."""
     alert_file = Path(__file__).parent.parent / "data" / "token_alert.json"
     alert_file.parent.mkdir(parents=True, exist_ok=True)
     with open(alert_file, "w") as f:
@@ -632,7 +421,7 @@ def main():
             detect_fn = cfg["detect_trend"]()
             traders[vid] = DhanPaperTrader(vid, detect_fn, broker, args.capital)
 
-        logger.info(f"Starting Dhan paper trading — V1 + V3, Rs.{args.capital:,.0f} each")
+        logger.info(f"Starting Dhan paper trading — V1 + V3 (BacktestEngine), Rs.{args.capital:,.0f} each")
         logger.info("Polling: 2 min (scanning) / 1 min (when trade open)")
         logger.info("Press Ctrl+C to stop.\n")
 
@@ -646,7 +435,7 @@ def main():
             if now.hour < 9 or (now.hour == 9 and now.minute < 15):
                 time.sleep(60); continue
 
-            # ── #3: Daily summary at 3:35 PM ──
+            # Daily summary at 3:35 PM
             if now.hour == 15 and now.minute >= 35 and today_str not in eod_summary_done:
                 _write_daily_summary(traders, today_str)
                 eod_summary_done[today_str] = True
@@ -657,25 +446,21 @@ def main():
             if now.hour >= 16:
                 time.sleep(3600); continue
 
-            # Fetch spot ONCE, share across all versions
+            # Fetch spot ONCE
             try:
                 spot_price = broker.get_spot_price("NIFTY")
                 logger.info(f"NIFTY: {spot_price:.2f}")
-                token_alert_written = False  # reset on success
+                token_alert_written = False
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"Spot fetch failed: {e}")
-
-                # ── #4: Token expiry detection ──
                 if "808" in error_msg or "Authentication" in error_msg or "Invalid Token" in error_msg:
                     if not token_alert_written:
                         _write_token_alert(True)
                         token_alert_written = True
                         logger.error("TOKEN EXPIRED! Update at http://SERVER:8080/")
-
                 time.sleep(60); continue
 
-            # Clear token alert on success
             if not token_alert_written:
                 _write_token_alert(False)
 
@@ -690,15 +475,13 @@ def main():
             for vid, trader in traders.items():
                 s = trader.get_summary()
                 status = "OPEN" if s["open_trade"] else "idle"
-                if s["open_trade"]:
-                    any_open = True
+                if s["open_trade"]: any_open = True
                 logger.info(f"  [{vid[:6]}] P&L={s['pnl']:+,.0f} | {s['trades']} trades | {status}")
 
-            # Adaptive polling: 1 min when trade open, 2 min when scanning
             if any_open:
-                time.sleep(60)   # 1 min — tighter exit monitoring
+                time.sleep(60)
             else:
-                time.sleep(120)  # 2 min — normal scanning
+                time.sleep(120)
 
     if args.dashboard:
         from paper_trading.run import generate_dashboard
