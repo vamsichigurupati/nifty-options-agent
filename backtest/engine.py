@@ -405,7 +405,9 @@ class BacktestEngine:
             spot_slice = self.spot.iloc[candle_index - lookback + 1:candle_index + 1].copy()
         atr_series = atr(spot_slice, period)
         val = atr_series.iloc[-1]
-        return float(val) if not np.isnan(val) else 0
+        if np.isnan(val) or val <= 0:
+            return 30.0  # safe fallback — ~30 pts is typical NIFTY 5-min ATR
+        return float(val)
 
     def _scan_and_signal(self, candle_index: int, candle_time: datetime,
                           spot_price: float, relaxed: bool = False):
@@ -593,19 +595,20 @@ class BacktestEngine:
             atr_sl_mult = self.p.get("atr_sl_multiplier", 1.5)
             min_sl_pct = self.p.get("min_sl_pct", 0.10)  # floor: SL at least X% of premium
 
-            if atr_val > 0:
-                est_delta = 0.4
-                sl_points = atr_val * atr_sl_mult * est_delta
-                sl = round(opt["ltp"] - sl_points, 2)
-            else:
-                sl = round(opt["ltp"] * (1 - self.p["sl_pct"]), 2)
+            est_delta = 0.4
+            sl_points = atr_val * atr_sl_mult * est_delta
+            sl = round(opt["ltp"] - sl_points, 2)
 
-            # Enforce minimum SL distance (floor)
+            # Enforce minimum SL distance (floor at min_sl_pct)
             min_sl = round(opt["ltp"] * (1 - min_sl_pct), 2)
-            sl = min(sl, min_sl)  # SL can't be tighter than min_sl_pct
-            sl = max(sl, opt["ltp"] * 0.50)  # but never more than 50% loss
+            sl = min(sl, min_sl)
+            sl = max(sl, opt["ltp"] * 0.50)  # cap at 50% loss
 
             risk = opt["ltp"] - sl
+            # Force minimum 5% risk — never enter with near-zero risk
+            if risk < opt["ltp"] * 0.05:
+                sl = round(opt["ltp"] * 0.85, 2)
+                risk = opt["ltp"] - sl
             if risk <= 0:
                 continue
             target = round(opt["ltp"] + risk * self.p["rr_ratio"], 2)
@@ -641,17 +644,18 @@ class BacktestEngine:
                 continue
             atr_sl_mult = self.p.get("atr_sl_multiplier", 1.5)
             min_sl_pct = self.p.get("min_sl_pct", 0.10)
-            if atr_val > 0:
-                est_delta = 0.4
-                sl_points = atr_val * atr_sl_mult * est_delta
-                sl = round(opt["ltp"] - sl_points, 2)
-            else:
-                sl = round(opt["ltp"] * (1 - self.p["sl_pct"]), 2)
+            est_delta = 0.4
+            sl_points = atr_val * atr_sl_mult * est_delta
+            sl = round(opt["ltp"] - sl_points, 2)
             min_sl = round(opt["ltp"] * (1 - min_sl_pct), 2)
             sl = min(sl, min_sl)
             sl = max(sl, opt["ltp"] * 0.50)
 
             risk = opt["ltp"] - sl
+            # Force minimum 5% risk
+            if risk < opt["ltp"] * 0.05:
+                sl = round(opt["ltp"] * 0.85, 2)
+                risk = opt["ltp"] - sl
             if risk <= 0:
                 continue
             target = round(opt["ltp"] + risk * self.p["rr_ratio"], 2)
