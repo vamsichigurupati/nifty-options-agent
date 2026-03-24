@@ -93,18 +93,13 @@ class DhanPaperTrader:
                 # Derive option chain from real spot (same as backtest)
                 options = derive_option_chain(df, "NIFTY")
 
-                # Create BacktestEngine with this data — uses EXACT same logic
-                # Override detect_trend with our version-specific one
-                from strategy import indicators as ind_module
-                original_detect = ind_module.detect_trend
-                ind_module.detect_trend = self.detect_trend
-
+                # Create BacktestEngine with version-specific detect_trend
+                # No monkey-patching — each engine gets its own function
                 self._engine = BacktestEngine(
                     spot_data=df, options_data=options,
                     underlying="NIFTY", initial_capital=self.capital,
+                    detect_trend_fn=self.detect_trend,
                 )
-                # Restore original
-                ind_module.detect_trend = original_detect
 
                 logger.info(f"[{self.version_id}] Loaded {len(df)} candles "
                             f"({df['date'].dt.date.nunique()} days). Engine ready.")

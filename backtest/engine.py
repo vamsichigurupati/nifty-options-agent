@@ -94,7 +94,8 @@ class BacktestEngine:
 
     def __init__(self, spot_data: pd.DataFrame, options_data: dict[str, pd.DataFrame],
                  underlying: str = "NIFTY", initial_capital: float = 100_000,
-                 strategies: list[str] = None, params: dict = None):
+                 strategies: list[str] = None, params: dict = None,
+                 detect_trend_fn=None):
         """
         Args:
             spot_data: DataFrame with date, open, high, low, close, volume
@@ -145,6 +146,7 @@ class BacktestEngine:
         self.initial_capital = initial_capital
         self.capital = initial_capital
         self.strategies = strategies or ["oi_reversal"]
+        self._custom_detect_trend = detect_trend_fn  # version-specific, or None for default
 
         # Override params
         self.p = {
@@ -291,7 +293,10 @@ class BacktestEngine:
 
     def _get_trend(self, candle_index: int) -> dict:
         """Detect trend using 5-min resampled data for stable signals."""
-        from strategy.indicators import detect_trend
+        if self._custom_detect_trend:
+            detect_trend = self._custom_detect_trend
+        else:
+            from strategy.indicators import detect_trend
         # Use 5-min bars for indicator calculation (avoids 1-min noise)
         if self._5m_index_map is not None and candle_index in self._5m_index_map:
             idx_5m = self._5m_index_map[candle_index]
