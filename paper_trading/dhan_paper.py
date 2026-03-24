@@ -73,6 +73,7 @@ class DhanPaperTrader:
         self.trades_today = 0
         self.last_trade_time = None
         self.spot_buffer = pd.DataFrame()
+        self._last_buffer_refresh = None
         self._load_state()
         self._preload_candles()
 
@@ -138,12 +139,25 @@ class DhanPaperTrader:
                 logger.error(f"[{self.version_id}] Spot fetch failed: {e}")
                 return None
 
-        # Add to buffer
-        new_row = pd.DataFrame([{
-            "date": current_time, "open": spot_price, "high": spot_price,
-            "low": spot_price, "close": spot_price, "volume": 100000,
-        }])
-        self.spot_buffer = pd.concat([self.spot_buffer, new_row], ignore_index=True)
+        # Refresh buffer from Dhan's real OHLC data every 5 minutes
+        # This gives proper high/low/open instead of flat spot ticks
+        needs_refresh = (
+            self._last_buffer_refresh is None or
+            (current_time - self._last_buffer_refresh).total_seconds() >= 300
+        )
+        if needs_refresh:
+            self._preload_candles()
+            self._last_buffer_refresh = current_time
+
+        # Append current tick as latest data point (will be overwritten on next refresh)
+        if not self.spot_buffer.empty:
+            last_date = self.spot_buffer.iloc[-1]["date"]
+            if (current_time - last_date).total_seconds() >= 60:
+                new_row = pd.DataFrame([{
+                    "date": current_time, "open": spot_price, "high": spot_price,
+                    "low": spot_price, "close": spot_price, "volume": 100000,
+                }])
+                self.spot_buffer = pd.concat([self.spot_buffer, new_row], ignore_index=True)
 
         # Keep last 500 candles
         if len(self.spot_buffer) > 500:
