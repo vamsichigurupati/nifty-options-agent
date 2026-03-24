@@ -280,10 +280,19 @@ class DhanPaperTrader:
 
         # SL / Target
         atr_val = atr(spot_5m, 14).iloc[-1] if len(spot_5m) >= 15 else 30
+        if pd.isna(atr_val) or atr_val <= 0:
+            atr_val = 30  # fallback to safe default
         sl_points = atr_val * self.PARAMS["atr_sl_multiplier"] * 0.4
-        sl = round(max(premium - sl_points, premium * (1 - self.PARAMS["min_sl_pct"])), 2)
+        sl = round(premium - sl_points, 2)
+        # Floor: SL never tighter than min_sl_pct of premium
+        min_sl = round(premium * (1 - self.PARAMS["min_sl_pct"]), 2)
+        sl = min(sl, min_sl)  # pick the LOWER (wider) SL
+        # Cap: SL never wider than 50% loss
         sl = max(sl, premium * 0.50)
         risk = premium - sl
+        if risk < premium * 0.05:  # minimum 5% risk (not zero)
+            sl = round(premium * 0.85, 2)  # force 15% SL
+            risk = premium - sl
         if risk <= 0: return None
         target = round(premium + risk * self.PARAMS["rr_ratio"], 2)
         qty = max(int(self.PARAMS["max_loss_per_trade"] / risk // 75) * 75, 75)
