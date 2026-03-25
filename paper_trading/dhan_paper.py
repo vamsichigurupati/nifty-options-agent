@@ -156,8 +156,8 @@ class DhanPaperTrader:
         if self.trades_today >= 2:
             return None
 
-        # Cooldown
-        if self.last_trade_time:
+        # Cooldown (skip after 1 PM to catch afternoon setups faster)
+        if self.last_trade_time and current_time.hour < 13:
             if (current_time - self.last_trade_time).total_seconds() / 60 < 30:
                 return None
 
