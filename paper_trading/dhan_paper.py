@@ -164,6 +164,11 @@ class DhanPaperTrader:
         # Generate signal using BacktestEngine
         signal = self._generate_signal(shared_spot, current_time)
         if signal:
+            # Target: lower of system target or entry + 25%
+            system_target = signal["target"]
+            pct_target = round(signal["entry_price"] * 1.25, 2)
+            final_target = min(system_target, pct_target)
+
             self.open_trade = {
                 "id": len(self.trades) + 1,
                 "version": self.version_id,
@@ -171,7 +176,7 @@ class DhanPaperTrader:
                 "type": signal["type"],
                 "entry_price": signal["entry_price"],
                 "stop_loss": signal["stop_loss"],
-                "target": signal["target"],
+                "target": final_target,
                 "quantity": signal["quantity"],
                 "entry_time": current_time.isoformat(),
                 "spot_at_entry": round(shared_spot, 2),
