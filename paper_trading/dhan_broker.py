@@ -43,7 +43,11 @@ class DhanBroker:
         if data and data.get("status") == "success":
             inner = data.get("data", {}).get("data", {})
             if isinstance(inner, dict) and seg in inner:
-                return inner[seg][sec_id]["last_price"]
+                seg_data = inner[seg]
+                # Key may be string "13" or integer 13 depending on SDK version
+                entry = seg_data.get(sec_id) or seg_data.get(int(sec_id))
+                if entry:
+                    return entry["last_price"]
         raise RuntimeError(f"Failed to get spot price: {data}")
 
     def get_intraday_data(self, security_id: str, exchange: str,
